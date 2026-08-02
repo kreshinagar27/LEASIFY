@@ -18,6 +18,7 @@ const {
 } = require('../controllers/authController');
 
 router.post('/register', registerOwner);
+router.post('/register-owner', registerOwner);
 router.get('/verify-email', verifyEmail);
 router.post('/login-owner', loginOwner);
 router.post('/login-tenant', loginTenant);

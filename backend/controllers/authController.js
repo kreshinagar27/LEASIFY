@@ -53,31 +53,63 @@ exports.registerOwner = async (req, res, next) => {
   try {
     const { name, email, password, contactNumber, address } = req.body;
 
-    // Check if email already registered
+    // 1. Validation
+    if (!name || !email || !password || !contactNumber) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields (name, email, password, contact number).'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long.'
+      });
+    }
+
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address.'
+      });
+    }
+
+    // 2. Prevent duplicate email (409 Conflict)
     const ownerExists = await Owner.findOne({ email });
     const tenantExists = await Tenant.findOne({ email });
 
     if (ownerExists || tenantExists) {
-      return res.status(400).json({ success: false, message: 'Email already registered.' });
+      return res.status(409).json({ success: false, message: 'Email already registered.' });
     }
 
-    // Create verification token
-    const verificationToken = crypto.randomBytes(20).toString('hex');
+    // 3. SMTP check & auto-verification in dev mode
+    const isSmtpConfigured = !!(process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS);
+    const autoVerify = !isSmtpConfigured || process.env.NODE_ENV === 'development';
+
+    const verificationToken = autoVerify ? undefined : crypto.randomBytes(20).toString('hex');
 
     const owner = await Owner.create({
       name,
       email,
       password,
       contactNumber,
-      address,
+      address: address || '',
+      verified: autoVerify ? true : false,
       verificationToken
     });
 
-    // Send verification email
-    try {
-      await sendVerificationEmail(owner, verificationToken);
-    } catch (err) {
-      console.error('Verification email failed to send:', err.message);
+    // 4. Optional SMTP verification email
+    if (isSmtpConfigured && !autoVerify && verificationToken) {
+      try {
+        await sendVerificationEmail(owner, verificationToken);
+      } catch (err) {
+        console.error('Verification email failed to send, defaulting account to verified:', err.message);
+        owner.verified = true;
+        owner.verificationToken = undefined;
+        await owner.save();
+      }
     }
 
     // Write audit trail
@@ -85,7 +117,10 @@ exports.registerOwner = async (req, res, next) => {
 
     res.status(201).json({
       success: true,
-      message: 'Owner registered. Please check email to verify your account.'
+      autoVerified: owner.verified,
+      message: owner.verified
+        ? 'Registration successful. Account created and ready for login.'
+        : 'Registration successful. Please check your email to verify your account.'
     });
   } catch (error) {
     next(error);

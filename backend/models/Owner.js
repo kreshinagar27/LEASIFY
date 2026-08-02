@@ -40,6 +40,10 @@ const OwnerSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
   verificationToken: String,
   resetPasswordToken: String,
   resetPasswordExpire: Date,
@@ -56,12 +60,8 @@ const OwnerSchema = new mongoose.Schema({
       url: String,
       publicId: String
     }
-  ],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+  ]
+}, { timestamps: true });
 
 // Hash password before saving
 OwnerSchema.pre('save', async function (next) {

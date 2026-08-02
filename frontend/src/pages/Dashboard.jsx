@@ -80,7 +80,7 @@ const Dashboard = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-black text-slate-800 dark:text-white Outfit">Owner Dashboard</h1>
-            <p className="text-xs text-slate-500">Welcome, Rajesh. Here is a summary of your portfolio yield.</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Welcome, {user?.name?.split(' ')[0] || 'Landlord'}. Here is a summary of your portfolio yield.</p>
           </div>
           <span className="text-xs font-mono text-slate-400">Current Period: {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
         </div>

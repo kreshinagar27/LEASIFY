@@ -73,12 +73,17 @@ export const AuthProvider = ({ children }) => {
         contactNumber,
         address
       });
-      if (data.success) {
-        toast.success(data.message || 'Registration successful! Check email.');
-        return { success: true };
+      if (data && data.success) {
+        toast.success(data.message || 'Registration successful!');
+        return { success: true, autoVerified: data.autoVerified, message: data.message };
+      } else {
+        const errMsg = data?.message || 'Registration failed.';
+        toast.error(errMsg);
+        return { success: false, error: errMsg };
       }
     } catch (error) {
-      const errMsg = error.response?.data?.message || 'Registration failed.';
+      const errMsg = error.response?.data?.message || 
+                     (error.code === 'ERR_NETWORK' || !error.response ? 'Unable to connect to server.' : 'Registration failed.');
       toast.error(errMsg);
       return { success: false, error: errMsg };
     } finally {
