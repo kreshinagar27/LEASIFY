@@ -1,0 +1,196 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Leasify API",
+    "description": "Production-Ready Commercial Rental Management System Backend API Documentation",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000/api/v1",
+      "description": "Local Development Server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new Owner",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "email": { "type": "string" },
+                  "password": { "type": "string" },
+                  "contactNumber": { "type": "string" },
+                  "address": { "type": "string" }
+                },
+                "required": ["name", "email", "password", "contactNumber"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Owner registered successfully" }
+        }
+      }
+    },
+    "/auth/login-owner": {
+      "post": {
+        "summary": "Owner login",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Token and profile returned" }
+        }
+      }
+    },
+    "/auth/login-tenant": {
+      "post": {
+        "summary": "Tenant login",
+        "tags": ["Authentication"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": { "type": "string" },
+                  "password": { "type": "string" }
+                },
+                "required": ["email", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Token and profile returned" }
+        }
+      }
+    },
+    "/properties": {
+      "get": {
+        "summary": "Get all owner properties",
+        "tags": ["Properties"],
+        "responses": {
+          "200": { "description": "Properties list" }
+        }
+      },
+      "post": {
+        "summary": "Add a new Property",
+        "tags": ["Properties"],
+        "responses": {
+          "201": { "description": "Property added" }
+        }
+      }
+    },
+    "/tenants": {
+      "get": {
+        "summary": "Get all tenants",
+        "tags": ["Tenants"],
+        "responses": {
+          "200": { "description": "Tenants list" }
+        }
+      },
+      "post": {
+        "summary": "Add and onboard a Tenant (Move-In)",
+        "tags": ["Tenants"],
+        "responses": {
+          "201": { "description": "Tenant registered and welcome email queued" }
+        }
+      }
+    },
+    "/bills": {
+      "get": {
+        "summary": "Get billing invoices list",
+        "tags": ["Billing"],
+        "responses": {
+          "200": { "description": "Invoice list" }
+        }
+      },
+      "post": {
+        "summary": "Generate a new monthly bill",
+        "tags": ["Billing"],
+        "responses": {
+          "201": { "description": "Bill created" }
+        }
+      }
+    },
+    "/payments/order": {
+      "post": {
+        "summary": "Create Razorpay Order for a Bill",
+        "tags": ["Payments"],
+        "responses": {
+          "200": { "description": "Order created" }
+        }
+      }
+    },
+    "/payments/verify": {
+      "post": {
+        "summary": "Verify payment & issue receipt PDF",
+        "tags": ["Payments"],
+        "responses": {
+          "200": { "description": "Payment verified" }
+        }
+      }
+    },
+    "/maintenance": {
+      "get": {
+        "summary": "Get maintenance tickets",
+        "tags": ["Maintenance"],
+        "responses": {
+          "200": { "description": "Ticket logs" }
+        }
+      },
+      "post": {
+        "summary": "Raise a maintenance work request",
+        "tags": ["Maintenance"],
+        "responses": {
+          "201": { "description": "Ticket raised" }
+        }
+      }
+    },
+    "/reports/owner-dashboard": {
+      "get": {
+        "summary": "Get financial analytics and graphs",
+        "tags": ["Reports"],
+        "responses": {
+          "200": { "description": "Dashboard telemetry feeds" }
+        }
+      }
+    }
+  }
+}
