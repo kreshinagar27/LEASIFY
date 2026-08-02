@@ -97,13 +97,13 @@ exports.addProperty = async (req, res, next) => {
       availableFromDate: availableFromDate ? new Date(availableFromDate) : Date.now(),
       images,
       address: {
-        houseNumber: houseNumber || '',
-        street: street || '',
-        area: area || '',
-        city: city || '',
-        state: state || '',
-        country: country || 'India',
-        pincode: pincode || ''
+        houseNumber: (req.body.address && req.body.address.houseNumber) || houseNumber || '',
+        street: (req.body.address && req.body.address.street) || street || '',
+        area: (req.body.address && req.body.address.area) || area || '',
+        city: (req.body.address && req.body.address.city) || city || '',
+        state: (req.body.address && req.body.address.state) || state || '',
+        country: (req.body.address && req.body.address.country) || country || 'India',
+        pincode: (req.body.address && req.body.address.pincode) || pincode || ''
       },
       location: {
         type: 'Point',
