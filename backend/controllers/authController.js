@@ -24,7 +24,7 @@ const sendTokenResponse = (user, statusCode, res) => {
     expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict'
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
   };
 
   res
@@ -329,9 +329,18 @@ exports.resetPassword = async (req, res, next) => {
 // @access  Private
 exports.getMe = async (req, res, next) => {
   try {
+    const user = req.user;
     res.status(200).json({
       success: true,
-      user: req.user
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: req.userRole || user.role,
+        profilePhoto: user.profilePhoto || '',
+        contactNumber: user.contactNumber || user.phone || '',
+        verified: user.verified !== undefined ? user.verified : true
+      }
     });
   } catch (error) {
     next(error);

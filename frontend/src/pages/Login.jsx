@@ -13,7 +13,7 @@ const Login = () => {
 
   const onSubmit = async (data) => {
     const res = await login(data.email, data.password, role);
-    if (res.success) {
+    if (res?.success) {
       if (res.user?.role === 'owner') {
         navigate('/dashboard/owner');
       } else {

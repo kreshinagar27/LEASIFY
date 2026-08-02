@@ -1,12 +1,14 @@
 const mongoose = require('mongoose');
 const dns = require('dns');
+const path = require('path');
+const dotenv = require('dotenv');
 
-// Ensure IPv4 first and set public DNS servers to resolve MongoDB Atlas SRV records reliably on Windows
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+// Ensure IPv4 first
 try {
   dns.setDefaultResultOrder('ipv4first');
 } catch (e) {}
-
-dns.setServers(['8.8.8.8', '1.1.1.1']);
 
 // Monitor Mongoose connection events
 mongoose.connection.on('connecting', () => {

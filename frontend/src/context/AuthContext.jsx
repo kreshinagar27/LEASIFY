@@ -40,13 +40,17 @@ export const AuthProvider = ({ children }) => {
       const endpoint = role === 'owner' ? '/auth/login-owner' : '/auth/login-tenant';
       const { data } = await apiClient.post(endpoint, { email, password });
       
-      if (data.success) {
+      if (data && data.success) {
         localStorage.setItem('accessToken', data.accessToken);
         localStorage.setItem('refreshToken', data.refreshToken);
         localStorage.setItem('user', JSON.stringify(data.user));
         setUser(data.user);
         toast.success(`Welcome back, ${data.user.name}!`);
         return { success: true, user: data.user };
+      } else {
+        const errMsg = data?.message || 'Login failed. Please check credentials.';
+        toast.error(errMsg);
+        return { success: false, error: errMsg };
       }
     } catch (error) {
       const errMsg = error.response?.data?.message || 'Login failed. Please try again.';
