@@ -53,7 +53,8 @@ export const AuthProvider = ({ children }) => {
         return { success: false, error: errMsg };
       }
     } catch (error) {
-      const errMsg = error.response?.data?.message || 'Login failed. Please try again.';
+      const errMsg = error.response?.data?.message || 
+                     (error.code === 'ERR_NETWORK' || !error.response ? 'Unable to connect to backend server. Please verify server is running on port 5000.' : 'Login failed. Please try again.');
       toast.error(errMsg);
       return { success: false, error: errMsg };
     } finally {
