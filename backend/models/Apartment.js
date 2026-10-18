@@ -21,7 +21,24 @@ const ApartmentSchema = new mongoose.Schema({
     default: 'Vacant'
   },
   property: { type: mongoose.Schema.Types.ObjectId, ref: 'Property', required: true },
-  tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'Tenant', default: null },
+  coverPhoto: { type: String, default: '' },
+  media: [
+    {
+      type: {
+        type: String,
+        enum: ['image', 'video'],
+        default: 'image'
+      },
+      url: { type: String, required: true },
+      publicId: { type: String, default: '' },
+      originalName: { type: String, default: '' },
+      size: { type: Number, default: 0 },
+      mimeType: { type: String, default: '' },
+      isCover: { type: Boolean, default: false },
+      order: { type: Number, default: 0 },
+      uploadedAt: { type: Date, default: Date.now }
+    }
+  ],
   images: [{ url: String, publicId: String }],
   createdAt: { type: Date, default: Date.now }
 });

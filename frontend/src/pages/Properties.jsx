@@ -5,6 +5,7 @@ import MapComponent from '../components/MapComponent';
 import { Plus, Search, Building, MapPin, Grid, SlidersHorizontal, Eye, Edit, Trash2, Shield, Wifi, Car, Zap, Droplets, Check, Compass, Calendar, Layers } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { getMediaUrl, DEFAULT_PROPERTY_IMAGE } from '../utils/mediaHelper';
 
 const AVAILABLE_AMENITIES = [
   'Lift / Elevator',
@@ -155,33 +156,33 @@ const Properties = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-white Outfit">Properties Portfolio</h1>
-          <p className="text-xs text-slate-500">Add, track, and manage all your real estate rental assets.</p>
+          <h1 className="text-2xl font-black text-[#38251F] dark:text-[#FAF7F1] Outfit">Properties Portfolio</h1>
+          <p className="text-xs text-[#78685D] dark:text-[#C5B5A5]">Add, track, and manage all your real estate rental assets.</p>
         </div>
         <button
           onClick={() => {
             setModalOpen(true);
             setActiveTab('basic');
           }}
-          className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/25 flex items-center gap-1.5 transition-all"
+          className="px-5 py-2.5 btn-primary-glow text-[#FAF7F1] font-bold text-xs rounded-full shadow-lg flex items-center gap-2 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add New Property
         </button>
       </div>
 
       {/* FILTER BAR */}
-      <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="glass-panel p-4 rounded-[1.75rem] border border-[#D9CBBB] dark:border-[#38251F] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 shadow-xs">
         <div className="relative">
           <input
             type="text"
             placeholder="Search name, street..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl glass-input"
+            className="w-full pl-8 pr-3 py-2 text-xs rounded-full glass-input"
           />
-          <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-slate-400" />
+          <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-[#78685D]" />
         </div>
 
         <input
@@ -189,13 +190,13 @@ const Properties = () => {
           placeholder="City (e.g. Bengaluru)"
           value={city}
           onChange={(e) => setCity(e.target.value)}
-          className="w-full px-3 py-1.5 text-xs rounded-xl glass-input"
+          className="w-full px-3 py-2 text-xs rounded-full glass-input"
         />
 
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="w-full px-2 py-1.5 text-xs rounded-xl glass-input"
+          className="w-full px-3 py-2 text-xs rounded-full glass-input"
         >
           <option value="">All Statuses</option>
           <option value="Vacant">Vacant</option>
@@ -207,7 +208,7 @@ const Properties = () => {
         <select
           value={type}
           onChange={(e) => setType(e.target.value)}
-          className="w-full px-2 py-1.5 text-xs rounded-xl glass-input"
+          className="w-full px-3 py-2 text-xs rounded-full glass-input"
         >
           <option value="">All Types</option>
           <option value="apartment">Apartment</option>
@@ -221,7 +222,7 @@ const Properties = () => {
           placeholder="Min Rent (INR)"
           value={minRent}
           onChange={(e) => setMinRent(e.target.value)}
-          className="w-full px-3 py-1.5 text-xs rounded-xl glass-input"
+          className="w-full px-3 py-2 text-xs rounded-full glass-input"
         />
 
         <input
@@ -229,7 +230,7 @@ const Properties = () => {
           placeholder="Max Rent (INR)"
           value={maxRent}
           onChange={(e) => setMaxRent(e.target.value)}
-          className="w-full px-3 py-1.5 text-xs rounded-xl glass-input"
+          className="w-full px-3 py-2 text-xs rounded-full glass-input"
         />
       </div>
 
@@ -237,81 +238,106 @@ const Properties = () => {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-72 glass-panel rounded-2xl animate-pulse bg-slate-200/50 dark:bg-slate-900/50" />
+            <div key={i} className="h-72 glass-panel rounded-[2rem] animate-pulse bg-[#E9DFD0]/40 dark:bg-[#2A1D18]/40 border border-[#D9CBBB]" />
           ))}
         </div>
       ) : properties.length === 0 ? (
-        <div className="py-12 text-center text-slate-400 glass-panel rounded-2xl border border-slate-200 dark:border-slate-800">
-          <Building className="w-12 h-12 mx-auto mb-2 text-slate-400 opacity-60" />
+        <div className="py-16 text-center text-[#78685D] glass-panel rounded-[2rem] border border-[#D9CBBB] dark:border-[#38251F]">
+          <Building className="w-12 h-12 mx-auto mb-2 text-[#78685D] opacity-60" />
           <p className="text-sm font-semibold">No rental units found matching filters.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {properties.map((prop) => {
-            let statusColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-            if (prop.status === 'Vacant') statusColor = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-            if (prop.status === 'Under Maintenance') statusColor = 'bg-red-500/10 text-red-500 border-red-500/20';
-            if (prop.status === 'Reserved') statusColor = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+            let statusColor = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
+            if (prop.status === 'Vacant') statusColor = 'bg-[#E9DFD0] text-[#4A1715] dark:bg-[#2A1D18] dark:text-[#E9DFD0] border-[#D9CBBB]';
+            if (prop.status === 'Under Maintenance') statusColor = 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20';
+            if (prop.status === 'Reserved') statusColor = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
 
             return (
               <div
                 key={prop._id}
-                className="glass-panel rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-lg relative flex flex-col justify-between glass-card-hover"
+                className="glass-panel rounded-[2rem] overflow-hidden border border-[#D9CBBB] dark:border-[#38251F] shadow-sm relative flex flex-col justify-between glass-card-hover bg-[#FAF7F1] dark:bg-[#1E1715]"
               >
                 {/* Image & Badges */}
-                <div className="h-44 bg-slate-100 dark:bg-slate-900 relative">
+                <div className="h-48 bg-[#E9DFD0]/60 dark:bg-[#2A1D18] relative overflow-hidden">
                   <img
-                    src={prop.images?.[0]?.url || 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400'}
+                    src={getMediaUrl(prop.coverPhoto || prop.media?.find(m => m.isCover)?.url || prop.images?.[0]?.url, DEFAULT_PROPERTY_IMAGE)}
                     alt={prop.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
                   />
                   <div className="absolute top-3 left-3 flex gap-1">
-                    <span className="text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 bg-slate-900/70 text-white rounded-full backdrop-blur-md">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 bg-[#4A1715]/85 text-[#FAF7F1] rounded-full backdrop-blur-md">
                       {prop.category || 'Residential'}
                     </span>
                   </div>
-                  <span className={`absolute top-3 right-3 text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 border rounded-full ${statusColor} backdrop-blur-md`}>
+                  <span className={`absolute top-3 right-3 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 border rounded-full ${statusColor} backdrop-blur-md`}>
                     {prop.status}
                   </span>
                 </div>
 
-                <div className="p-4 flex-1 flex flex-col justify-between">
+                <div className="p-5 flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 className="font-extrabold text-sm text-slate-800 dark:text-white truncate Outfit">
+                    <h3 className="font-extrabold text-base text-[#38251F] dark:text-[#FAF7F1] truncate Outfit">
                       {prop.name}
                     </h3>
-                    <p className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
-                      <MapPin className="w-3 h-3 text-slate-400" />
+                    <p className="text-[11px] text-[#78685D] dark:text-[#C5B5A5] flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-brand-600" />
                       {prop.address?.city}, {prop.address?.state}
                     </p>
 
-                    <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-200/50 dark:border-slate-800/50 text-[11px] text-slate-500 dark:text-slate-400">
+                    <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-[#D9CBBB]/60 dark:border-[#38251F] text-[11px]">
                       <div>
-                        <strong className="block text-[10px] text-slate-400 uppercase">Rent</strong>
-                        <p className="text-slate-800 dark:text-slate-200 font-bold">₹{prop.monthlyRent?.toLocaleString()}</p>
+                        <strong className="block text-[10px] text-[#78685D] uppercase">Rent</strong>
+                        <p className="text-[#38251F] dark:text-[#FAF7F1] font-black">₹{prop.monthlyRent?.toLocaleString()}</p>
                       </div>
                       <div>
-                        <strong className="block text-[10px] text-slate-400 uppercase">Type</strong>
-                        <p className="text-slate-800 dark:text-slate-200 font-bold uppercase">{prop.type}</p>
+                        <strong className="block text-[10px] text-[#78685D] uppercase">Type</strong>
+                        <p className="text-[#38251F] dark:text-[#FAF7F1] font-bold uppercase">{prop.type}</p>
                       </div>
                       <div>
-                        <strong className="block text-[10px] text-slate-400 uppercase">Specs</strong>
-                        <p className="text-slate-800 dark:text-slate-200 font-bold">{prop.bedrooms} BHK | Fl {prop.floorNumber}</p>
+                        <strong className="block text-[10px] text-[#78685D] uppercase">Specs</strong>
+                        <p className="text-[#38251F] dark:text-[#FAF7F1] font-bold">{prop.bedrooms} BHK | Fl {prop.floorNumber}</p>
                       </div>
                     </div>
                   </div>
 
+                  {/* Tenant Profile Snippet */}
+                  {prop.tenant ? (
+                    <div className="mt-4 p-2.5 rounded-2xl bg-[#E9DFD0]/40 dark:bg-[#2A1D18]/50 border border-[#D9CBBB]/60 dark:border-[#38251F] flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={getMediaUrl(prop.tenant.profilePhoto)}
+                          onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'; }}
+                          alt=""
+                          className="w-8 h-8 rounded-full object-cover border border-[#D9CBBB] flex-shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-bold text-[#38251F] dark:text-[#FAF7F1] truncate">{prop.tenant.name}</p>
+                          <p className="text-[10px] text-[#78685D] truncate">{prop.tenant.phone || prop.tenant.email}</p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-full border border-emerald-500/20 whitespace-nowrap">
+                        Tenant
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="mt-4 p-2.5 rounded-2xl bg-[#E9DFD0]/20 dark:bg-[#2A1D18]/20 border border-dashed border-[#D9CBBB] dark:border-[#38251F] text-center">
+                      <span className="text-[10px] font-semibold text-[#78685D]">Vacant • Ready for Lease</span>
+                    </div>
+                  )}
+
                   {/* Actions footer */}
-                  <div className="flex gap-2 mt-4 pt-3 border-t border-slate-200/50 dark:border-slate-800/50">
+                  <div className="flex gap-2 mt-4 pt-3 border-t border-[#D9CBBB]/60 dark:border-[#38251F]">
                     <Link
                       to={`/properties/${prop._id}`}
-                      className="flex-1 py-1.5 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg text-center text-xs font-bold transition-all flex items-center justify-center gap-1"
+                      className="flex-1 py-2 bg-[#E9DFD0] hover:bg-[#E5D8C7] dark:bg-[#2A1D18] dark:hover:bg-[#38251F] text-[#38251F] dark:text-[#FAF7F1] rounded-full text-center text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs"
                     >
                       <Eye className="w-3.5 h-3.5" /> View Details
                     </Link>
                     <button
                       onClick={() => handleDelete(prop._id, prop.name)}
-                      className="p-1.5 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors border border-red-500/10"
+                      className="p-2 text-rose-600 hover:bg-rose-500/10 rounded-full transition-colors border border-rose-500/20 cursor-pointer"
                       title="Delete Property"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -326,12 +352,12 @@ const Properties = () => {
 
       {/* ADD PROPERTY MODAL WITH SECTION TABS */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
-          <div className="w-full max-w-3xl glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col relative max-h-[92vh] overflow-y-auto shadow-2xl">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop-warm p-4">
+          <div className="w-full max-w-3xl glass-panel-elevated rounded-[2rem] border border-[#D9CBBB] dark:border-[#38251F] p-6 flex flex-col relative max-h-[92vh] overflow-y-auto shadow-2xl bg-[#FAF7F1] dark:bg-[#1C1614]">
+            <div className="flex justify-between items-center pb-3 border-b border-[#D9CBBB]/70 dark:border-[#38251F] mb-4">
               <div>
-                <h3 className="font-extrabold text-lg text-slate-800 dark:text-slate-100 Outfit">Add New Property Unit</h3>
-                <p className="text-xs text-slate-500">Fill in detailed real-estate specs, pricing, address & amenities.</p>
+                <h3 className="font-extrabold text-lg text-[#38251F] dark:text-[#FAF7F1] Outfit">Add New Property Unit</h3>
+                <p className="text-xs text-[#78685D]">Fill in detailed real-estate specs, pricing, address & amenities.</p>
               </div>
               <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
             </div>

@@ -1,4 +1,6 @@
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs');
 const Property = require('../models/Property');
 const Tenant = require('../models/Tenant');
 const logActivity = require('../utils/activityLogger');
@@ -49,11 +51,31 @@ exports.addProperty = async (req, res, next) => {
 
     // Check files upload
     const images = [];
+    const media = [];
+    let coverPhoto = '';
     if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
+      for (let i = 0; i < req.files.length; i++) {
+        const file = req.files[i];
+        const isVideo = (file.mimetype && file.mimetype.startsWith('video/')) ||
+                        ['.mp4', '.webm', '.mov'].includes(path.extname(file.originalname).toLowerCase());
         const uploadResult = await uploadToStorage(file, 'properties');
         if (uploadResult) {
           images.push(uploadResult);
+          const isCover = !coverPhoto && !isVideo;
+          if (isCover) {
+            coverPhoto = uploadResult.url;
+          }
+          media.push({
+            type: isVideo ? 'video' : 'image',
+            url: uploadResult.url,
+            publicId: uploadResult.publicId || '',
+            originalName: file.originalname || '',
+            size: file.size || 0,
+            mimeType: file.mimetype || (isVideo ? 'video/mp4' : 'image/jpeg'),
+            isCover,
+            order: i,
+            uploadedAt: new Date()
+          });
         }
       }
     }
@@ -95,6 +117,8 @@ exports.addProperty = async (req, res, next) => {
       electricityCharges: parseFloat(electricityCharges) || 0,
       waterCharges: parseFloat(waterCharges) || 0,
       availableFromDate: availableFromDate ? new Date(availableFromDate) : Date.now(),
+      coverPhoto: coverPhoto || (images.length > 0 ? images[0].url : ''),
+      media: media || [],
       images,
       address: {
         houseNumber: (req.body.address && req.body.address.houseNumber) || houseNumber || '',
@@ -166,12 +190,35 @@ exports.getProperties = async (req, res, next) => {
       queryObj.isArchived = { $ne: true };
     }
 
-    const properties = await Property.find(queryObj).populate('tenant', 'name email phone');
+    const properties = await Property.find(queryObj).populate(
+      'tenant',
+      'name email phone profilePhoto occupation unitNumber gender isActive'
+    );
+
+    const propertyList = await Promise.all(
+      properties.map(async (prop) => {
+        let propObj = prop.toObject ? prop.toObject() : prop;
+        if (!propObj.tenant) {
+          const assigned = await Tenant.findOne({ propertyAssigned: prop._id, isActive: true })
+            .select('name email phone profilePhoto occupation unitNumber gender isActive');
+          if (assigned) {
+            propObj.tenant = assigned;
+            if (propObj.status === 'Vacant') propObj.status = 'Occupied';
+            await Property.findByIdAndUpdate(prop._id, { tenant: assigned._id, status: 'Occupied' });
+          }
+        } else if (propObj.tenant && propObj.tenant.isActive === false) {
+          propObj.tenant = null;
+          if (propObj.status === 'Occupied') propObj.status = 'Vacant';
+          await Property.findByIdAndUpdate(prop._id, { tenant: null, status: 'Vacant' });
+        }
+        return propObj;
+      })
+    );
 
     res.status(200).json({
       success: true,
-      count: properties.length,
-      data: properties
+      count: propertyList.length,
+      data: propertyList
     });
   } catch (error) {
     next(error);
@@ -190,7 +237,7 @@ exports.getMyProperty = async (req, res, next) => {
 
     const property = await Property.findById(tenant.propertyAssigned)
       .populate('owner', 'name email contactNumber profilePhoto')
-      .populate('tenant', 'name email phone occupation emergencyContact leaseStartDate leaseEndDate leaseAgreementUrl');
+      .populate('tenant', 'name email phone occupation gender unitNumber aadhaarNumber panNumber emergencyContact leaseStartDate leaseEndDate leaseAgreementUrl profilePhoto isActive address');
 
     if (!property) {
       return res.status(404).json({ success: false, message: 'Property details not found' });
@@ -214,25 +261,48 @@ exports.getProperty = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid Property ID' });
     }
 
-    const property = await Property.findById(req.params.id)
-      .populate('owner', 'name email contactNumber profilePhoto')
-      .populate('tenant', 'name email phone occupation emergencyContact leaseStartDate leaseEndDate leaseAgreementUrl');
-
+    let property = await Property.findById(req.params.id);
     if (!property) {
       return res.status(404).json({ success: false, message: 'Property not found' });
     }
 
     // Role-based auth check
-    if (req.userRole === 'owner' && property.owner._id.toString() !== req.user.id) {
+    if (req.userRole === 'owner' && property.owner._id.toString() !== req.user.id && property.owner.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Not authorized to view this property' });
     }
-    if (req.userRole === 'tenant' && (!property.tenant || property.tenant._id.toString() !== req.user.id)) {
-      return res.status(403).json({ success: false, message: 'Not authorized to view this property' });
+    if (req.userRole === 'tenant') {
+      const activeTenantDoc = await Tenant.findById(req.user.id);
+      if (!activeTenantDoc || activeTenantDoc.propertyAssigned?.toString() !== property._id.toString()) {
+        return res.status(403).json({ success: false, message: 'Not authorized to view this property' });
+      }
     }
+
+    // Auto-sync / heal tenancy linkage
+    if (property.tenant) {
+      const currentTenant = await Tenant.findById(property.tenant);
+      if (!currentTenant || !currentTenant.isActive || currentTenant.propertyAssigned?.toString() !== property._id.toString()) {
+        property.tenant = null;
+        if (property.status === 'Occupied') property.status = 'Vacant';
+        await Property.findByIdAndUpdate(property._id, { tenant: null, status: property.status });
+      }
+    }
+
+    if (!property.tenant) {
+      const assignedTenant = await Tenant.findOne({ propertyAssigned: property._id, isActive: true });
+      if (assignedTenant) {
+        property.tenant = assignedTenant._id;
+        property.status = 'Occupied';
+        await Property.findByIdAndUpdate(property._id, { tenant: assignedTenant._id, status: 'Occupied' });
+      }
+    }
+
+    const populatedProperty = await Property.findById(property._id)
+      .populate('owner', 'name email contactNumber profilePhoto')
+      .populate('tenant', 'name email phone occupation gender unitNumber aadhaarNumber panNumber emergencyContact leaseStartDate leaseEndDate leaseAgreementUrl profilePhoto isActive address');
 
     res.status(200).json({
       success: true,
-      data: property
+      data: populatedProperty
     });
   } catch (error) {
     next(error);
@@ -339,7 +409,9 @@ exports.updateProperty = async (req, res, next) => {
     property = await Property.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true
-    });
+    })
+      .populate('owner', 'name email contactNumber profilePhoto')
+      .populate('tenant', 'name email phone occupation gender unitNumber aadhaarNumber panNumber emergencyContact leaseStartDate leaseEndDate leaseAgreementUrl profilePhoto isActive address');
 
     await logActivity(req.user.id, 'Owner', 'Property Updated', `Property '${property.name}' was updated.`, req);
 
@@ -483,6 +555,317 @@ exports.deleteProperty = async (req, res, next) => {
     }
 
     return res.status(400).json({ success: false, message: 'Invalid deletion strategy specified.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Upload photos & videos to Property Gallery
+// @route   POST /api/v1/properties/:id/media
+// @access  Private (Owner Only)
+exports.uploadPropertyMedia = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Property ID' });
+    }
+
+    const property = await Property.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found' });
+    }
+
+    // Ownership check
+    if (property.owner.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to upload media for this property' });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please select files to upload' });
+    }
+
+    // Backend validation of file sizes and types
+    const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+    const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB
+
+    for (const file of req.files) {
+      const isVideo = (file.mimetype && file.mimetype.startsWith('video/')) || 
+                      ['.mp4', '.webm', '.mov'].includes(path.extname(file.originalname).toLowerCase());
+
+      if (isVideo) {
+        if (file.size > MAX_VIDEO_SIZE) {
+          req.files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+          return res.status(400).json({
+            success: false,
+            message: `Video '${file.originalname}' exceeds 100 MB. Video must be smaller than 100 MB.`
+          });
+        }
+      } else {
+        if (file.size > MAX_IMAGE_SIZE) {
+          req.files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+          return res.status(400).json({
+            success: false,
+            message: `Image '${file.originalname}' exceeds 10 MB. Image must be smaller than 10 MB.`
+          });
+        }
+      }
+    }
+
+    // Process and upload each file
+    const uploadedMediaItems = [];
+    const hasExistingCover = property.media && property.media.some(m => m.isCover);
+    let coverAssigned = hasExistingCover || !!property.coverPhoto;
+
+    for (let i = 0; i < req.files.length; i++) {
+      const file = req.files[i];
+      const isVideo = (file.mimetype && file.mimetype.startsWith('video/')) ||
+                      ['.mp4', '.webm', '.mov'].includes(path.extname(file.originalname).toLowerCase());
+      
+      const uploadResult = await uploadToStorage(file, 'properties');
+      if (uploadResult) {
+        const isCover = !coverAssigned && !isVideo;
+        if (isCover) {
+          coverAssigned = true;
+          property.coverPhoto = uploadResult.url;
+        }
+
+        const mediaItem = {
+          type: isVideo ? 'video' : 'image',
+          url: uploadResult.url,
+          publicId: uploadResult.publicId || '',
+          originalName: file.originalname || '',
+          size: file.size || 0,
+          mimeType: file.mimetype || (isVideo ? 'video/mp4' : 'image/jpeg'),
+          isCover,
+          order: (property.media ? property.media.length : 0) + i,
+          uploadedAt: new Date()
+        };
+
+        property.media.push(mediaItem);
+        uploadedMediaItems.push(mediaItem);
+
+        // Keep legacy property.images and property.videoUrl synced
+        if (!isVideo) {
+          property.images.push({ url: uploadResult.url, publicId: uploadResult.publicId });
+        } else if (!property.videoUrl) {
+          property.videoUrl = uploadResult.url;
+        }
+      }
+    }
+
+    // If still no cover photo and we have an image, set first image as cover
+    if (!property.coverPhoto) {
+      const firstImg = property.media.find(m => m.type === 'image');
+      if (firstImg) {
+        firstImg.isCover = true;
+        property.coverPhoto = firstImg.url;
+      }
+    }
+
+    await property.save();
+
+    await logActivity(
+      req.user.id,
+      'Owner',
+      'Property Media Upload',
+      `Uploaded ${uploadedMediaItems.length} media file(s) to property '${property.name}'.`,
+      req
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully uploaded ${uploadedMediaItems.length} media file(s).`,
+      coverPhoto: property.coverPhoto,
+      data: property.media,
+      property
+    });
+  } catch (error) {
+    if (req.files) {
+      req.files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+    }
+    next(error);
+  }
+};
+
+// @desc    Delete photo or video from Property Gallery
+// @route   DELETE /api/v1/properties/:id/media/:mediaId
+// @access  Private (Owner Only)
+exports.deletePropertyMedia = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.mediaId)) {
+      return res.status(400).json({ success: false, message: 'Invalid Property or Media ID' });
+    }
+
+    const property = await Property.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found' });
+    }
+
+    if (property.owner.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to delete media from this property' });
+    }
+
+    const mediaItem = property.media.id(req.params.mediaId);
+    if (!mediaItem) {
+      return res.status(404).json({ success: false, message: 'Media item not found' });
+    }
+
+    const wasCover = mediaItem.isCover || (property.coverPhoto === mediaItem.url);
+    const publicId = mediaItem.publicId;
+    const mediaType = mediaItem.type;
+    const mediaUrl = mediaItem.url;
+
+    // Delete from storage provider (Cloudinary or local)
+    if (publicId) {
+      await deleteFromStorage(publicId, mediaType === 'video' ? 'video' : 'image');
+    }
+
+    // Pull from property.media
+    property.media.pull({ _id: req.params.mediaId });
+
+    // Sync legacy images array
+    property.images = property.images.filter(img => img.url !== mediaUrl && (!publicId || img.publicId !== publicId));
+
+    // If was cover photo, assign next available image as cover
+    if (wasCover) {
+      const nextImage = property.media.find(m => m.type === 'image');
+      if (nextImage) {
+        nextImage.isCover = true;
+        property.coverPhoto = nextImage.url;
+      } else {
+        property.coverPhoto = '';
+      }
+    }
+
+    // If deleted item was videoUrl
+    if (property.videoUrl === mediaUrl) {
+      const nextVideo = property.media.find(m => m.type === 'video');
+      property.videoUrl = nextVideo ? nextVideo.url : '';
+    }
+
+    await property.save();
+
+    await logActivity(
+      req.user.id,
+      'Owner',
+      'Property Media Deleted',
+      `Deleted ${mediaType} from property '${property.name}'.`,
+      req
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `${mediaType === 'video' ? 'Video' : 'Photo'} deleted successfully.`,
+      coverPhoto: property.coverPhoto,
+      data: property.media,
+      property
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Set an image as Property Cover Photo
+// @route   PATCH /api/v1/properties/:id/media/:mediaId/cover
+// @access  Private (Owner Only)
+exports.setCoverPhoto = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.mediaId)) {
+      return res.status(400).json({ success: false, message: 'Invalid Property or Media ID' });
+    }
+
+    const property = await Property.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found' });
+    }
+
+    if (property.owner.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to manage this property' });
+    }
+
+    const targetMedia = property.media.id(req.params.mediaId);
+    if (!targetMedia) {
+      return res.status(404).json({ success: false, message: 'Media item not found' });
+    }
+
+    if (targetMedia.type !== 'image') {
+      return res.status(400).json({ success: false, message: 'Only photos can be set as the cover photo' });
+    }
+
+    // Set all items isCover = false, except target
+    property.media.forEach(m => {
+      m.isCover = (m._id.toString() === req.params.mediaId);
+    });
+
+    property.coverPhoto = targetMedia.url;
+
+    // Prioritize cover photo in legacy images array so images[0] is cover photo
+    const existingImgIdx = property.images.findIndex(img => img.url === targetMedia.url);
+    if (existingImgIdx > 0) {
+      const [movedImg] = property.images.splice(existingImgIdx, 1);
+      property.images.unshift(movedImg);
+    }
+
+    await property.save();
+
+    await logActivity(
+      req.user.id,
+      'Owner',
+      'Property Cover Photo Updated',
+      `Set new cover photo for property '${property.name}'.`,
+      req
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Cover photo updated successfully.',
+      coverPhoto: property.coverPhoto,
+      data: property.media,
+      property
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reorder Property Gallery media
+// @route   PATCH /api/v1/properties/:id/media/reorder
+// @access  Private (Owner Only)
+exports.reorderPropertyMedia = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Property ID' });
+    }
+
+    const property = await Property.findById(req.params.id);
+    if (!property) {
+      return res.status(404).json({ success: false, message: 'Property not found' });
+    }
+
+    if (property.owner.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to manage this property' });
+    }
+
+    const { mediaIds } = req.body;
+    if (!Array.isArray(mediaIds)) {
+      return res.status(400).json({ success: false, message: 'mediaIds must be an array' });
+    }
+
+    mediaIds.forEach((mediaId, index) => {
+      const item = property.media.id(mediaId);
+      if (item) {
+        item.order = index;
+      }
+    });
+
+    property.media.sort((a, b) => a.order - b.order);
+
+    await property.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Gallery order updated successfully.',
+      data: property.media
+    });
   } catch (error) {
     next(error);
   }

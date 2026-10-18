@@ -98,38 +98,38 @@ const Search = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-black text-slate-800 dark:text-white Outfit flex items-center gap-2">
+        <h1 className="text-2xl font-black text-espresso dark:text-cream-50 Outfit flex items-center gap-2">
           <SearchIcon className="w-6 h-6 text-brand-500" /> Global Search
         </h1>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-cream-600 dark:text-cream-400">
           Showing {totalResultsCount} results for "{query}"
         </p>
       </div>
 
       {totalResultsCount === 0 ? (
-        <div className="glass-panel py-16 text-center text-slate-400 rounded-2xl">
-          <SearchIcon className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-          <p className="text-sm font-semibold">No records found matching your keyword.</p>
+        <div className="glass-panel py-16 text-center text-cream-500 rounded-3xl border border-cream-300 dark:border-espresso-800">
+          <SearchIcon className="w-12 h-12 mx-auto mb-2 text-cream-400" />
+          <p className="text-sm font-semibold text-espresso dark:text-cream-100">No records found matching your keyword.</p>
         </div>
       ) : (
         <div className="space-y-6">
           {/* PROPERTIES */}
           {results.properties.length > 0 && (
             <div className="space-y-3">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-cream-600 dark:text-cream-400 flex items-center gap-1.5">
                 <Building className="w-4 h-4 text-brand-500" /> Properties ({results.properties.length})
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {results.properties.map(p => (
-                  <div key={p._id} className="glass-panel p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+                  <div key={p._id} className="glass-card-hover p-4 rounded-2xl border border-cream-300 dark:border-espresso-800 flex justify-between items-center text-xs bg-cream-50/70 dark:bg-espresso-900/40">
                     <div>
-                      <h4 className="font-bold text-slate-800 dark:text-white">{p.name}</h4>
-                      <p className="text-[10px] text-slate-400">{p.address.houseNumber}, {p.address.street}, {p.address.city}</p>
+                      <h4 className="font-bold text-espresso dark:text-cream-100">{p.name}</h4>
+                      <p className="text-[10px] text-cream-600 dark:text-cream-400">{p.address.houseNumber}, {p.address.street}, {p.address.city}</p>
                     </div>
-                    <Link to={`/properties/${p._id}`} className="p-1.5 bg-brand-500/10 text-brand-500 rounded-lg hover:bg-brand-500/20">
-                      <Eye className="w-3.5 h-3.5" />
+                    <Link to={`/properties/${p._id}`} className="p-2 bg-brand-500/10 text-brand-600 dark:text-cream-100 rounded-xl hover:bg-brand-500/20 transition-colors">
+                      <Eye className="w-4 h-4" />
                     </Link>
                   </div>
                 ))}
@@ -140,18 +140,18 @@ const Search = () => {
           {/* TENANTS */}
           {results.tenants.length > 0 && (
             <div className="space-y-3">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-cream-600 dark:text-cream-400 flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-brand-500" /> Tenants ({results.tenants.length})
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {results.tenants.map(t => (
-                  <div key={t._id} className="glass-panel p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+                  <div key={t._id} className="glass-card-hover p-4 rounded-2xl border border-cream-300 dark:border-espresso-800 flex justify-between items-center text-xs bg-cream-50/70 dark:bg-espresso-900/40">
                     <div>
-                      <h4 className="font-bold text-slate-800 dark:text-white">{t.name}</h4>
-                      <p className="text-[10px] text-slate-400">Email: {t.email} | Phone: {t.phone}</p>
+                      <h4 className="font-bold text-espresso dark:text-cream-100">{t.name}</h4>
+                      <p className="text-[10px] text-cream-600 dark:text-cream-400">Email: {t.email} | Phone: {t.phone}</p>
                     </div>
-                    <Link to={`/tenants/${t._id}`} className="p-1.5 bg-brand-500/10 text-brand-500 rounded-lg hover:bg-brand-500/20">
-                      <Eye className="w-3.5 h-3.5" />
+                    <Link to={`/tenants/${t._id}`} className="p-2 bg-brand-500/10 text-brand-600 dark:text-cream-100 rounded-xl hover:bg-brand-500/20 transition-colors">
+                      <Eye className="w-4 h-4" />
                     </Link>
                   </div>
                 ))}
@@ -162,18 +162,18 @@ const Search = () => {
           {/* INVOICES */}
           {results.bills.length > 0 && (
             <div className="space-y-3">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-cream-600 dark:text-cream-400 flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-brand-500" /> Bills & Invoices ({results.bills.length})
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {results.bills.map(b => (
-                  <div key={b._id} className="glass-panel p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+                  <div key={b._id} className="glass-card-hover p-4 rounded-2xl border border-cream-300 dark:border-espresso-800 flex justify-between items-center text-xs bg-cream-50/70 dark:bg-espresso-900/40">
                     <div>
-                      <h4 className="font-bold text-slate-800 dark:text-white">{b.invoiceNumber}</h4>
-                      <p className="text-[10px] text-slate-400">Month: {b.month}/{b.year} | Amount: INR {b.totalAmount.toLocaleString()} | Status: {b.status}</p>
+                      <h4 className="font-bold text-espresso dark:text-cream-100">{b.invoiceNumber}</h4>
+                      <p className="text-[10px] text-cream-600 dark:text-cream-400">Month: {b.month}/{b.year} | Amount: INR {b.totalAmount.toLocaleString()} | Status: {b.status}</p>
                     </div>
-                    <Link to={`/bills`} className="p-1.5 bg-brand-500/10 text-brand-500 rounded-lg hover:bg-brand-500/20">
-                      <Eye className="w-3.5 h-3.5" />
+                    <Link to={`/bills`} className="p-2 bg-brand-500/10 text-brand-600 dark:text-cream-100 rounded-xl hover:bg-brand-500/20 transition-colors">
+                      <Eye className="w-4 h-4" />
                     </Link>
                   </div>
                 ))}
@@ -184,18 +184,18 @@ const Search = () => {
           {/* COMPLAINTS */}
           {results.complaints.length > 0 && (
             <div className="space-y-3">
-              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-cream-600 dark:text-cream-400 flex items-center gap-1.5">
                 <Wrench className="w-4 h-4 text-brand-500" /> Maintenance Tickets ({results.complaints.length})
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {results.complaints.map(c => (
-                  <div key={c._id} className="glass-panel p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-between items-center text-xs">
+                  <div key={c._id} className="glass-card-hover p-4 rounded-2xl border border-cream-300 dark:border-espresso-800 flex justify-between items-center text-xs bg-cream-50/70 dark:bg-espresso-900/40">
                     <div>
-                      <h4 className="font-bold text-slate-800 dark:text-white">{c.complaintId} ({c.category})</h4>
-                      <p className="text-[10px] text-slate-400 truncate max-w-xs">{c.description}</p>
+                      <h4 className="font-bold text-espresso dark:text-cream-100">{c.complaintId} ({c.category})</h4>
+                      <p className="text-[10px] text-cream-600 dark:text-cream-400 truncate max-w-xs">{c.description}</p>
                     </div>
-                    <Link to={`/maintenance`} className="p-1.5 bg-brand-500/10 text-brand-500 rounded-lg hover:bg-brand-500/20">
-                      <Eye className="w-3.5 h-3.5" />
+                    <Link to={`/maintenance`} className="p-2 bg-brand-500/10 text-brand-600 dark:text-cream-100 rounded-xl hover:bg-brand-500/20 transition-colors">
+                      <Eye className="w-4 h-4" />
                     </Link>
                   </div>
                 ))}

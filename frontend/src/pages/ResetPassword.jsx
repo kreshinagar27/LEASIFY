@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Lock, Check } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
+import { Lock, Check, Building2, Sun, Moon, ArrowRight, ShieldCheck } from 'lucide-react';
+import PasswordInput from '../components/PasswordInput';
 import apiClient from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -11,6 +13,7 @@ const ResetPassword = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [complete, setComplete] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm();
 
@@ -34,81 +37,127 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 relative overflow-hidden">
-      <div className="bg-glow-purple top-10 left-10"></div>
-      <div className="bg-glow-indigo bottom-20 right-20"></div>
+    <div className="min-h-screen flex flex-col justify-between bg-[#EAE1D4] dark:bg-[#211A16] text-[#39251F] dark:text-[#F6EEE3] p-4 py-8 relative overflow-hidden transition-colors duration-200">
+      {/* Background Ambient Warm Glows for Frosted Glass Depth */}
+      <div className="fixed top-12 left-1/4 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(213,187,151,0.45)_0%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(117,64,57,0.22)_0%,transparent_70%)] pointer-events-none blur-3xl -z-10" />
+      <div className="fixed bottom-10 right-1/4 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(161,117,91,0.30)_0%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(140,85,60,0.18)_0%,transparent_70%)] pointer-events-none blur-3xl -z-10" />
 
-      <div className="w-full max-w-md glass-panel rounded-3xl p-8 border border-slate-200/50 dark:border-slate-800/50 shadow-2xl relative z-10">
+      {/* Top Header Navigation */}
+      <div className="max-w-md w-full mx-auto flex items-center justify-between mb-4 z-10">
+        <Link to="/" className="flex items-center gap-2 group">
+          <img
+            src="/logo-dark.png"
+            alt="Leasify"
+            className="h-8 w-auto object-contain brightness-0 dark:brightness-100 transition-all group-hover:scale-105"
+          />
+        </Link>
+
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          id="reset-pwd-theme-toggle"
+          aria-label="Toggle Theme"
+          className="p-2 px-3 rounded-full bg-[#E6DACC] dark:bg-[#352920] border border-[#D9CABB] dark:border-[rgba(230,211,191,0.15)] text-[#39251F] dark:text-[#F6EEE3] hover:text-[#4A1917] hover:scale-105 transition-all shadow-sm flex items-center gap-2 text-xs font-semibold cursor-pointer"
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-[#4A1917]" />
+          )}
+        </button>
+      </div>
+
+      <div className="w-full max-w-md mx-auto glass-panel-elevated rounded-[2rem] p-6 sm:p-8 border border-[#D9CBBB] dark:border-[#38251F] shadow-2xl relative z-10 my-auto">
         {complete ? (
           <div className="text-center py-4">
-            <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
-              <Check className="w-6 h-6" />
+            <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
+              <Check className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-bold text-slate-800 dark:text-white Outfit">Reset Completed</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 leading-relaxed">
-              Your password has been changed successfully. You can now log back in using your new credentials.
+            <h3 className="text-2xl font-black text-[#38251F] dark:text-[#FAF7F1] Outfit">
+              Password Updated
+            </h3>
+            <p className="text-xs text-[#78685D] dark:text-[#C5B5A5] mt-2 leading-relaxed">
+              Your credentials were changed successfully. You can now log back into your portal.
             </p>
             <Link
               to="/login"
-              className="inline-block mt-6 px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-lg transition-all"
+              className="inline-flex items-center gap-2 mt-6 px-6 py-3 btn-primary-glow text-[#FAF7F1] font-bold text-xs rounded-xl shadow-lg transition-all"
             >
-              Sign In
+              Sign In to Account <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         ) : (
           <div>
-            <h2 className="text-xl font-black text-slate-800 dark:text-white Outfit">
-              Configure New Password
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 mb-6">
-              Please enter your new password details below.
-            </p>
+            <div className="mb-6">
+              <h2 className="text-2xl font-black text-[#38251F] dark:text-[#FAF7F1] Outfit">
+                Set New Password
+              </h2>
+              <p className="text-xs text-[#78685D] dark:text-[#C5B5A5] mt-1">
+                Enter your new secure account password below.
+              </p>
+            </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">New Password</label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    {...register('password', {
-                      required: 'Password is required',
-                      minLength: { value: 6, message: 'Password must be at least 6 characters' }
-                    })}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl glass-input text-sm"
-                  />
-                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                </div>
-                {errors.password && <span className="text-[10px] text-red-500 mt-0.5 block">{errors.password.message}</span>}
+                <label className="text-xs font-bold text-[#38251F] dark:text-[#E9DFD0] block mb-1.5">
+                  New Password
+                </label>
+                <PasswordInput
+                  id="reset-password"
+                  placeholder="••••••••••••"
+                  {...register('password', {
+                    required: 'Password is required',
+                    minLength: { value: 6, message: 'Password must be at least 6 characters' }
+                  })}
+                />
+                {errors.password && (
+                  <span className="text-[11px] text-red-500 font-medium mt-1 block">
+                    {errors.password.message}
+                  </span>
+                )}
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-slate-500 block mb-1">Confirm Password</label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    {...register('confirmPassword', {
-                      required: 'Confirm password is required',
-                      validate: (val) => val === watch('password') || 'Passwords do not match'
-                    })}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-2xl glass-input text-sm"
-                  />
-                  <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-                </div>
-                {errors.confirmPassword && <span className="text-[10px] text-red-500 mt-0.5 block">{errors.confirmPassword.message}</span>}
+                <label className="text-xs font-bold text-[#38251F] dark:text-[#E9DFD0] block mb-1.5">
+                  Confirm Password
+                </label>
+                <PasswordInput
+                  id="reset-confirm-password"
+                  placeholder="••••••••••••"
+                  {...register('confirmPassword', {
+                    required: 'Confirm password is required',
+                    validate: (val) => val === watch('password') || 'Passwords do not match'
+                  })}
+                />
+                {errors.confirmPassword && (
+                  <span className="text-[11px] text-red-500 font-medium mt-1 block">
+                    {errors.confirmPassword.message}
+                  </span>
+                )}
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 mt-2 text-sm font-bold text-white bg-brand-500 hover:bg-brand-600 rounded-2xl shadow-lg transition-all"
+                className="w-full py-3.5 mt-2 text-sm font-bold text-[#FAF7F1] btn-primary-glow rounded-2xl shadow-lg flex items-center justify-center gap-2 group transition-all cursor-pointer"
               >
-                {loading ? 'Updating Password...' : 'Save Password'}
+                {loading ? (
+                  'Updating Password...'
+                ) : (
+                  <>
+                    <span>Save New Password</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
               </button>
             </form>
           </div>
         )}
+      </div>
+
+      <div className="max-w-md w-full mx-auto text-center text-xs text-[#78685D] dark:text-[#78685D] pt-4 z-10">
+        © {new Date().getFullYear()} Leasify Cloud Inc.
       </div>
     </div>
   );

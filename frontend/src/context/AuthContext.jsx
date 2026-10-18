@@ -1,12 +1,24 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import apiClient from '../services/api';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    const token = localStorage.getItem('accessToken');
+    const savedUser = localStorage.getItem('user');
+    return Boolean(token && !savedUser);
+  });
+  const isLoggingInRef = useRef(false);
 
   // Initialize and check current user session
   useEffect(() => {
@@ -21,6 +33,7 @@ export const AuthProvider = ({ children }) => {
         const { data } = await apiClient.get('/auth/me');
         if (data.success) {
           setUser(data.user);
+          localStorage.setItem('user', JSON.stringify(data.user));
         }
       } catch (err) {
         console.error('Session validation failed:', err.message);
@@ -35,29 +48,35 @@ export const AuthProvider = ({ children }) => {
 
   // Login handler
   const login = async (email, password, role) => {
+    if (isLoggingInRef.current) {
+      return { success: false, error: 'Login in progress' };
+    }
+    isLoggingInRef.current = true;
     setLoading(true);
     try {
+      const normalizedEmail = (typeof email === 'string' ? email : '').trim().toLowerCase();
       const endpoint = role === 'owner' ? '/auth/login-owner' : '/auth/login-tenant';
-      const { data } = await apiClient.post(endpoint, { email, password });
+      const { data } = await apiClient.post(endpoint, { email: normalizedEmail, password });
       
       if (data && data.success) {
         localStorage.setItem('accessToken', data.accessToken);
         localStorage.setItem('refreshToken', data.refreshToken);
         localStorage.setItem('user', JSON.stringify(data.user));
         setUser(data.user);
-        toast.success(`Welcome back, ${data.user.name}!`);
+        toast.success(`Welcome back, ${data.user.name}!`, { id: 'auth-toast' });
         return { success: true, user: data.user };
       } else {
         const errMsg = data?.message || 'Login failed. Please check credentials.';
-        toast.error(errMsg);
+        toast.error(errMsg, { id: 'auth-toast' });
         return { success: false, error: errMsg };
       }
     } catch (error) {
       const errMsg = error.response?.data?.message || 
-                     (error.code === 'ERR_NETWORK' || !error.response ? 'Unable to connect to backend server. Please verify server is running on port 5000.' : 'Login failed. Please try again.');
-      toast.error(errMsg);
+                     (error.code === 'ERR_NETWORK' || !error.response ? 'Unable to connect to backend server. Please verify server is running on port 5001.' : 'Login failed. Please try again.');
+      toast.error(errMsg, { id: 'auth-toast' });
       return { success: false, error: errMsg };
     } finally {
+      isLoggingInRef.current = false;
       setLoading(false);
     }
   };
@@ -75,6 +94,34 @@ export const AuthProvider = ({ children }) => {
       });
       if (data && data.success) {
         toast.success(data.message || 'Registration successful!');
+        return { success: true, autoVerified: data.autoVerified, message: data.message };
+      } else {
+        const errMsg = data?.message || 'Registration failed.';
+        toast.error(errMsg);
+        return { success: false, error: errMsg };
+      }
+    } catch (error) {
+      const errMsg = error.response?.data?.message || 
+                     (error.code === 'ERR_NETWORK' || !error.response ? 'Unable to connect to server.' : 'Registration failed.');
+      toast.error(errMsg);
+      return { success: false, error: errMsg };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Register Tenant handler
+  const registerTenant = async (name, email, password, phone) => {
+    setLoading(true);
+    try {
+      const { data } = await apiClient.post('/auth/register-tenant', {
+        name,
+        email,
+        password,
+        phone
+      });
+      if (data && data.success) {
+        toast.success(data.message || 'Tenant registration successful!');
         return { success: true, autoVerified: data.autoVerified, message: data.message };
       } else {
         const errMsg = data?.message || 'Registration failed.';
@@ -124,11 +171,11 @@ export const AuthProvider = ({ children }) => {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       if (data.success) {
-        const updatedUser = { ...user, profilePhoto: data.url };
+        const updatedUser = data.user || { ...user, profilePhoto: data.url };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
-        toast.success('Profile photo uploaded.');
-        return { success: true, url: data.url };
+        toast.success('Profile photo updated successfully.');
+        return { success: true, url: data.url, user: updatedUser };
       }
     } catch (error) {
       const errMsg = error.response?.data?.message || 'Photo upload failed.';
@@ -145,6 +192,7 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated: !!user,
         login,
         register,
+        registerTenant,
         logout,
         updateProfile,
         updatePhoto

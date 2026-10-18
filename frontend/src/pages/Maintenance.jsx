@@ -112,15 +112,15 @@ const Maintenance = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-800 dark:text-white Outfit">Maintenance & Support</h1>
-          <p className="text-xs text-slate-500">File repair tickets and monitor resolution logs.</p>
+          <h1 className="text-2xl font-black text-[#38251F] dark:text-[#FAF7F1] Outfit">Maintenance & Support</h1>
+          <p className="text-xs text-[#78685D] dark:text-[#C5B5A5]">File repair tickets and monitor resolution logs.</p>
         </div>
         {user.role === 'tenant' && (
           <button
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-brand-500 hover:bg-brand-600 rounded-xl shadow-lg shadow-brand-500/20 transition-all duration-200"
+            className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-[#FAF7F1] btn-primary-glow rounded-full shadow-lg transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Raise Ticket
           </button>
@@ -128,11 +128,11 @@ const Maintenance = () => {
       </div>
 
       {/* SEARCH AND FILTERS BAR */}
-      <div className="glass-panel p-4 rounded-2xl border border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
+      <div className="glass-panel p-4 rounded-[1.75rem] border border-[#D9CBBB] dark:border-[#38251F] grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg shadow-xs">
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="w-full px-2 py-1.5 text-xs rounded-xl glass-input"
+          className="w-full px-3 py-2 text-xs rounded-full glass-input"
         >
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
@@ -144,7 +144,7 @@ const Maintenance = () => {
         <select
           value={priority}
           onChange={(e) => setPriority(e.target.value)}
-          className="w-full px-2 py-1.5 text-xs rounded-xl glass-input"
+          className="w-full px-3 py-2 text-xs rounded-full glass-input"
         >
           <option value="">All Priorities</option>
           <option value="low">Low</option>
@@ -157,71 +157,71 @@ const Maintenance = () => {
       {loading ? (
         <div className="space-y-4 animate-pulse">
           {[1, 2, 3].map(n => (
-            <div key={n} className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+            <div key={n} className="h-20 bg-[#E9DFD0]/40 dark:bg-[#2A1D18]/40 rounded-2xl"></div>
           ))}
         </div>
       ) : requests.length === 0 ? (
-        <div className="glass-panel py-16 text-center text-slate-400 rounded-2xl">
-          <Wrench className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+        <div className="glass-panel py-16 text-center text-[#78685D] rounded-[2rem] border border-[#D9CBBB] dark:border-[#38251F]">
+          <Wrench className="w-12 h-12 mx-auto mb-2 text-[#78685D] opacity-40" />
           <p className="text-sm font-semibold">No maintenance tickets logged.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {requests.map((req) => {
-            let priorityBadge = 'bg-slate-100 text-slate-500';
-            if (req.priority === 'medium') priorityBadge = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-            if (req.priority === 'high') priorityBadge = 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse';
+            let priorityBadge = 'bg-[#FAF7F1] text-[#78685D] border-[#D9CBBB]';
+            if (req.priority === 'medium') priorityBadge = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
+            if (req.priority === 'high') priorityBadge = 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20 animate-pulse';
 
-            let statusBadge = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+            let statusBadge = 'bg-[#E9DFD0] text-[#4A1715] dark:bg-[#2A1D18] dark:text-[#E9DFD0] border-[#D9CBBB]';
             let StatusIcon = Clock;
             
             if (req.status === 'accepted') {
-              statusBadge = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+              statusBadge = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
               StatusIcon = Hammer;
             }
             if (req.status === 'resolved') {
-              statusBadge = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+              statusBadge = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
               StatusIcon = CheckCircle2;
             }
             if (req.status === 'rejected') {
-              statusBadge = 'bg-red-500/10 text-red-500 border-red-500/20';
+              statusBadge = 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20';
               StatusIcon = AlertOctagon;
             }
 
             return (
               <div
                 key={req._id}
-                className="glass-panel rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-md flex flex-col md:flex-row justify-between gap-4 items-start md:items-center glass-card-hover"
+                className="glass-panel rounded-[1.75rem] p-5 border border-[#D9CBBB] dark:border-[#38251F] shadow-sm flex flex-col md:flex-row justify-between gap-4 items-start md:items-center glass-card-hover bg-[#FAF7F1] dark:bg-[#1E1715]"
               >
                 <div className="space-y-2 flex-1 min-w-0">
                   <div className="flex flex-wrap gap-2 items-center">
-                    <span className="font-mono font-bold text-xs text-slate-700 dark:text-slate-300">
+                    <span className="font-mono font-bold text-xs text-[#38251F] dark:text-[#FAF7F1]">
                       {req.complaintId}
                     </span>
-                    <span className="text-[10px] bg-brand-500/10 text-brand-500 px-2 py-0.5 rounded-full font-bold">
+                    <span className="text-[10px] bg-[#E9DFD0] dark:bg-[#2A1D18] text-[#4A1715] dark:text-[#E9DFD0] px-2.5 py-0.5 rounded-full font-bold">
                       {req.category}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wider ${priorityBadge}`}>
+                    <span className={`px-2.5 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wider ${priorityBadge}`}>
                       {req.priority}
                     </span>
-                    <span className={`inline-flex items-center gap-0.5 px-2.5 py-0.5 border rounded-full text-[9px] font-bold uppercase tracking-wider ${statusBadge}`}>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 border rounded-full text-[9px] font-bold uppercase tracking-wider ${statusBadge}`}>
                       <StatusIcon className="w-3 h-3" />
                       {req.status === 'accepted' ? 'In Progress' : req.status}
                     </span>
                   </div>
 
-                  <p className="text-slate-800 dark:text-slate-200 text-xs font-semibold">
+                  <p className="text-[#38251F] dark:text-[#FAF7F1] text-xs font-semibold">
                     Property: {req.property?.name} | Resident: {req.tenant?.name}
                   </p>
-                  <p className="text-slate-500 dark:text-slate-400 text-xs leading-relaxed max-w-2xl">
+                  <p className="text-[#78685D] dark:text-[#C5B5A5] text-xs leading-relaxed max-w-2xl">
                     {req.description}
                   </p>
 
                   {/* Resolution notes display */}
                   {req.resolutionNotes && (
-                    <div className="p-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-[10px] text-slate-600 dark:text-slate-400 max-w-xl">
-                      <strong>Resolution Notes:</strong> {req.resolutionNotes}
-                      {req.assignedWorker && <span className="block mt-0.5 font-bold">Technician: {req.assignedWorker} | Cost: INR {req.estimatedCost}</span>}
+                    <div className="p-3 bg-[#E9DFD0]/40 dark:bg-[#2A1D18]/40 border border-[#D9CBBB]/60 dark:border-[#38251F] rounded-xl text-[11px] text-[#78685D] dark:text-[#C5B5A5] max-w-xl">
+                      <strong className="text-[#38251F] dark:text-[#FAF7F1]">Resolution Notes:</strong> {req.resolutionNotes}
+                      {req.assignedWorker && <span className="block mt-1 font-bold text-[#38251F] dark:text-[#FAF7F1]">Technician: {req.assignedWorker} | Cost: ₹{req.estimatedCost}</span>}
                     </div>
                   )}
 
@@ -229,15 +229,15 @@ const Maintenance = () => {
                   {(req.beforeImages?.length > 0 || req.afterImages?.length > 0) && (
                     <div className="flex gap-2 pt-2 overflow-x-auto">
                       {req.beforeImages?.map((url, i) => (
-                        <div key={i} className="relative w-12 h-12 rounded-lg border overflow-hidden">
+                        <div key={i} className="relative w-12 h-12 rounded-lg border border-[#D9CBBB] overflow-hidden">
                           <img src={url} alt="Before" className="w-full h-full object-cover" />
-                          <span className="absolute bottom-0 inset-x-0 bg-slate-950/70 text-[7px] text-white text-center">Before</span>
+                          <span className="absolute bottom-0 inset-x-0 bg-[#4A1715]/80 text-[7px] text-[#FAF7F1] text-center">Before</span>
                         </div>
                       ))}
                       {req.afterImages?.map((url, i) => (
-                        <div key={i} className="relative w-12 h-12 rounded-lg border overflow-hidden">
+                        <div key={i} className="relative w-12 h-12 rounded-lg border border-[#D9CBBB] overflow-hidden">
                           <img src={url} alt="After" className="w-full h-full object-cover" />
-                          <span className="absolute bottom-0 inset-x-0 bg-emerald-950/70 text-[7px] text-white text-center">After</span>
+                          <span className="absolute bottom-0 inset-x-0 bg-emerald-900/80 text-[7px] text-[#FAF7F1] text-center">After</span>
                         </div>
                       ))}
                     </div>

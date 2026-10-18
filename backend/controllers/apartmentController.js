@@ -12,32 +12,85 @@ const { uploadToStorage, deleteFromStorage } = require('../utils/uploader');
 // @access  Private (Owner Only)
 exports.createApartment = async (req, res, next) => {
   try {
-    const {
-      number,
-      floor,
-      areaSqFt,
-      bedrooms,
-      bathrooms,
-      balcony,
-      parkingAvailable,
-      furnishedStatus,
-      monthlyRent,
-      securityDeposit,
-      status,
-      propertyId
-    } = req.body;
+    const number = req.body.number || req.body.apartmentNumber;
+    const floor = req.body.floor !== undefined && req.body.floor !== '' ? req.body.floor : req.body.floorNumber;
+    const areaSqFt = req.body.areaSqFt;
+    const bedrooms = req.body.bedrooms !== undefined && req.body.bedrooms !== '' ? req.body.bedrooms : 0;
+    const bathrooms = req.body.bathrooms !== undefined && req.body.bathrooms !== '' ? req.body.bathrooms : 0;
+    const balcony = req.body.balcony !== undefined 
+      ? (req.body.balcony === 'true' || req.body.balcony === true) 
+      : (req.body.balconies !== undefined ? Number(req.body.balconies) > 0 : false);
+    const parkingAvailable = req.body.parkingAvailable === 'true' || req.body.parkingAvailable === true;
+    const furnishedStatus = req.body.furnishedStatus || 'unfurnished';
+    const monthlyRent = req.body.monthlyRent !== undefined && req.body.monthlyRent !== '' ? req.body.monthlyRent : req.body.rent;
+    const rawDeposit = req.body.securityDeposit !== undefined && req.body.securityDeposit !== '' 
+      ? req.body.securityDeposit 
+      : req.body.deposit;
+    const securityDeposit = rawDeposit !== undefined && rawDeposit !== '' 
+      ? rawDeposit 
+      : (monthlyRent ? parseFloat(monthlyRent) * 2 : 0);
+    const status = req.body.status || 'Vacant';
+    let propertyId = req.body.propertyId || req.body.property;
 
-    if (!number || !floor || !areaSqFt || !monthlyRent || !securityDeposit || !propertyId) {
-      return res.status(400).json({ success: false, message: 'Required fields missing.' });
+    if (!number) {
+      return res.status(400).json({ success: false, message: 'Apartment/Unit number is required.' });
+    }
+    if (floor === undefined || floor === null || floor === '') {
+      return res.status(400).json({ success: false, message: 'Floor number is required.' });
+    }
+    if (!areaSqFt) {
+      return res.status(400).json({ success: false, message: 'Area in sq ft is required.' });
+    }
+    if (monthlyRent === undefined || monthlyRent === null || monthlyRent === '') {
+      return res.status(400).json({ success: false, message: 'Monthly rent is required.' });
     }
 
-    // Verify property ownership
-    const property = await Property.findById(propertyId);
-    if (!property) {
-      return res.status(404).json({ success: false, message: 'Property not found.' });
-    }
-    if (property.owner.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'Not authorized for this property.' });
+    // Resolve or verify property ownership
+    let property;
+    if (propertyId) {
+      if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+        return res.status(400).json({ success: false, message: 'Invalid property ID.' });
+      }
+      property = await Property.findById(propertyId);
+      if (!property) {
+        return res.status(404).json({ success: false, message: 'Selected property was not found.' });
+      }
+      if (property.owner.toString() !== req.user.id) {
+        return res.status(403).json({ success: false, message: 'Not authorized for this property.' });
+      }
+    } else {
+      // Find the first property owned by this user
+      property = await Property.findOne({ owner: req.user.id });
+      if (!property) {
+        // Auto-create a default property so the owner is never blocked from adding apartments
+        property = await Property.create({
+          name: 'Primary Property',
+          type: 'apartment',
+          category: 'Residential',
+          monthlyRent: parseFloat(monthlyRent) || 15000,
+          securityDeposit: parseFloat(securityDeposit) || 30000,
+          areaSqFt: parseFloat(areaSqFt) || 1000,
+          floorNumber: parseFloat(floor) || 1,
+          totalFloors: Math.max(parseFloat(floor) || 1, 5),
+          furnishedStatus: furnishedStatus || 'unfurnished',
+          owner: req.user.id,
+          address: {
+            houseNumber: '1',
+            street: 'Main Street',
+            area: 'Central',
+            city: 'Bengaluru',
+            state: 'Karnataka',
+            country: 'India',
+            pincode: '560001'
+          },
+          location: {
+            type: 'Point',
+            coordinates: [77.5946, 12.9716]
+          },
+          status: 'Vacant'
+        });
+      }
+      propertyId = property._id;
     }
 
     // Handle image uploads if any
@@ -81,7 +134,7 @@ exports.getApartments = async (req, res, next) => {
     // Find properties owned by the user and then apartments linked to them
     const ownedProperties = await Property.find({ owner: req.user.id }).select('_id');
     const propertyIds = ownedProperties.map(p => p._id);
-    const apartments = await Apartment.find({ property: { $in: propertyIds } }).populate('property', 'name address status');
+    const apartments = await Apartment.find({ property: { $in: propertyIds } }).populate('property', 'name address status owner');
     res.status(200).json({ success: true, count: apartments.length, data: apartments });
   } catch (error) {
     next(error);
@@ -96,12 +149,12 @@ exports.getApartment = async (req, res, next) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ success: false, message: 'Invalid Apartment ID' });
     }
-    const apartment = await Apartment.findById(req.params.id).populate('property', 'name address status');
+    const apartment = await Apartment.findById(req.params.id).populate('property');
     if (!apartment) {
       return res.status(404).json({ success: false, message: 'Apartment not found' });
     }
     // Ensure owner owns the property
-    if (apartment.property.owner.toString() !== req.user.id) {
+    if (apartment.property && apartment.property.owner && apartment.property.owner.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Not authorized to view this apartment' });
     }
     res.status(200).json({ success: true, data: apartment });
@@ -122,7 +175,7 @@ exports.updateApartment = async (req, res, next) => {
     if (!apartment) {
       return res.status(404).json({ success: false, message: 'Apartment not found' });
     }
-    if (apartment.property.owner.toString() !== req.user.id) {
+    if (apartment.property && apartment.property.owner && apartment.property.owner.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Not authorized to update this apartment' });
     }
 
@@ -135,36 +188,46 @@ exports.updateApartment = async (req, res, next) => {
       }
     }
 
-    const {
-      number,
-      floor,
-      areaSqFt,
-      bedrooms,
-      bathrooms,
-      balcony,
-      parkingAvailable,
-      furnishedStatus,
-      monthlyRent,
-      securityDeposit,
-      status
-    } = req.body;
+    const number = req.body.number || req.body.apartmentNumber || apartment.number;
+    const floor = req.body.floor !== undefined && req.body.floor !== '' ? req.body.floor : (req.body.floorNumber !== undefined ? req.body.floorNumber : apartment.floor);
+    const areaSqFt = req.body.areaSqFt !== undefined && req.body.areaSqFt !== '' ? req.body.areaSqFt : apartment.areaSqFt;
+    const bedrooms = req.body.bedrooms !== undefined && req.body.bedrooms !== '' ? req.body.bedrooms : apartment.bedrooms;
+    const bathrooms = req.body.bathrooms !== undefined && req.body.bathrooms !== '' ? req.body.bathrooms : apartment.bathrooms;
+    const balcony = req.body.balcony !== undefined 
+      ? (req.body.balcony === 'true' || req.body.balcony === true) 
+      : (req.body.balconies !== undefined ? Number(req.body.balconies) > 0 : apartment.balcony);
+    const parkingAvailable = req.body.parkingAvailable !== undefined 
+      ? (req.body.parkingAvailable === 'true' || req.body.parkingAvailable === true) 
+      : apartment.parkingAvailable;
+    const furnishedStatus = req.body.furnishedStatus || apartment.furnishedStatus;
+    const monthlyRent = req.body.monthlyRent !== undefined && req.body.monthlyRent !== '' ? req.body.monthlyRent : (req.body.rent !== undefined ? req.body.rent : apartment.monthlyRent);
+    const rawDeposit = req.body.securityDeposit !== undefined && req.body.securityDeposit !== '' ? req.body.securityDeposit : req.body.deposit;
+    const securityDeposit = rawDeposit !== undefined && rawDeposit !== '' ? rawDeposit : apartment.securityDeposit;
+    const status = req.body.status || apartment.status;
 
     const updateData = {
-      number: number || apartment.number,
-      floor: floor !== undefined ? parseFloat(floor) : apartment.floor,
-      areaSqFt: areaSqFt !== undefined ? parseFloat(areaSqFt) : apartment.areaSqFt,
-      bedrooms: bedrooms !== undefined ? parseFloat(bedrooms) : apartment.bedrooms,
-      bathrooms: bathrooms !== undefined ? parseFloat(bathrooms) : apartment.bathrooms,
-      balcony: balcony !== undefined ? (balcony === 'true' || balcony === true) : apartment.balcony,
-      parkingAvailable: parkingAvailable !== undefined ? (parkingAvailable === 'true' || parkingAvailable === true) : apartment.parkingAvailable,
-      furnishedStatus: furnishedStatus || apartment.furnishedStatus,
-      monthlyRent: monthlyRent !== undefined ? parseFloat(monthlyRent) : apartment.monthlyRent,
-      securityDeposit: securityDeposit !== undefined ? parseFloat(securityDeposit) : apartment.securityDeposit,
-      status: status || apartment.status,
+      number,
+      floor: parseFloat(floor),
+      areaSqFt: parseFloat(areaSqFt),
+      bedrooms: parseFloat(bedrooms) || 0,
+      bathrooms: parseFloat(bathrooms) || 0,
+      balcony: balcony === true,
+      parkingAvailable: parkingAvailable === true,
+      furnishedStatus,
+      monthlyRent: parseFloat(monthlyRent),
+      securityDeposit: parseFloat(securityDeposit),
+      status,
       images
     };
 
-    apartment = await Apartment.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true });
+    if (req.body.propertyId && mongoose.Types.ObjectId.isValid(req.body.propertyId)) {
+      const newProp = await Property.findById(req.body.propertyId);
+      if (newProp && newProp.owner.toString() === req.user.id) {
+        updateData.property = newProp._id;
+      }
+    }
+
+    apartment = await Apartment.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true }).populate('property', 'name address status');
     await logActivity(req.user.id, 'Owner', 'Apartment Updated', `Apartment '${apartment.number}' updated.`, req);
     res.status(200).json({ success: true, data: apartment });
   } catch (error) {
@@ -184,7 +247,7 @@ exports.deleteApartment = async (req, res, next) => {
     if (!apartment) {
       return res.status(404).json({ success: false, message: 'Apartment not found' });
     }
-    if (apartment.property.owner.toString() !== req.user.id) {
+    if (apartment.property && apartment.property.owner && apartment.property.owner.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Not authorized to delete this apartment' });
     }
 
@@ -198,6 +261,178 @@ exports.deleteApartment = async (req, res, next) => {
     await Apartment.findByIdAndDelete(req.params.id);
     await logActivity(req.user.id, 'Owner', 'Apartment Deleted', `Apartment '${apartment.number}' removed.`, req);
     res.status(200).json({ success: true, message: 'Apartment deleted successfully.' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Upload photos & videos to Apartment Gallery
+// @route   POST /api/v1/apartments/:id/media
+// @access  Private (Owner Only)
+exports.uploadApartmentMedia = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Apartment ID' });
+    }
+
+    const apartment = await Apartment.findById(req.params.id).populate('property');
+    if (!apartment) {
+      return res.status(404).json({ success: false, message: 'Apartment not found' });
+    }
+
+    if (apartment.property.owner.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized for this apartment' });
+    }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'Please select files to upload' });
+    }
+
+    const path = require('path');
+    const fs = require('fs');
+    const MAX_IMAGE_SIZE = 10 * 1024 * 1024;
+    const MAX_VIDEO_SIZE = 100 * 1024 * 1024;
+
+    for (const file of req.files) {
+      const isVideo = (file.mimetype && file.mimetype.startsWith('video/')) || 
+                      ['.mp4', '.webm', '.mov'].includes(path.extname(file.originalname).toLowerCase());
+      if (isVideo && file.size > MAX_VIDEO_SIZE) {
+        req.files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+        return res.status(400).json({ success: false, message: `Video '${file.originalname}' exceeds 100 MB.` });
+      }
+      if (!isVideo && file.size > MAX_IMAGE_SIZE) {
+        req.files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+        return res.status(400).json({ success: false, message: `Image '${file.originalname}' exceeds 10 MB.` });
+      }
+    }
+
+    const uploaded = [];
+    const hasCover = apartment.media && apartment.media.some(m => m.isCover);
+    let coverAssigned = hasCover || !!apartment.coverPhoto;
+
+    for (let i = 0; i < req.files.length; i++) {
+      const file = req.files[i];
+      const isVideo = (file.mimetype && file.mimetype.startsWith('video/')) ||
+                      ['.mp4', '.webm', '.mov'].includes(path.extname(file.originalname).toLowerCase());
+      const uploadResult = await uploadToStorage(file, 'apartments');
+      if (uploadResult) {
+        const isCover = !coverAssigned && !isVideo;
+        if (isCover) {
+          coverAssigned = true;
+          apartment.coverPhoto = uploadResult.url;
+        }
+
+        const mediaItem = {
+          type: isVideo ? 'video' : 'image',
+          url: uploadResult.url,
+          publicId: uploadResult.publicId || '',
+          originalName: file.originalname || '',
+          size: file.size || 0,
+          mimeType: file.mimetype || (isVideo ? 'video/mp4' : 'image/jpeg'),
+          isCover,
+          order: (apartment.media ? apartment.media.length : 0) + i,
+          uploadedAt: new Date()
+        };
+
+        apartment.media.push(mediaItem);
+        uploaded.push(mediaItem);
+        if (!isVideo) {
+          apartment.images.push({ url: uploadResult.url, publicId: uploadResult.publicId });
+        }
+      }
+    }
+
+    if (!apartment.coverPhoto) {
+      const firstImg = apartment.media.find(m => m.type === 'image');
+      if (firstImg) {
+        firstImg.isCover = true;
+        apartment.coverPhoto = firstImg.url;
+      }
+    }
+
+    await apartment.save();
+    res.status(200).json({
+      success: true,
+      message: `Uploaded ${uploaded.length} file(s).`,
+      coverPhoto: apartment.coverPhoto,
+      data: apartment.media,
+      apartment
+    });
+  } catch (error) {
+    if (req.files) {
+      const fs = require('fs');
+      req.files.forEach(f => { if (fs.existsSync(f.path)) fs.unlinkSync(f.path); });
+    }
+    next(error);
+  }
+};
+
+// @desc    Delete photo or video from Apartment Gallery
+// @route   DELETE /api/v1/apartments/:id/media/:mediaId
+// @access  Private (Owner Only)
+exports.deleteApartmentMedia = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.mediaId)) {
+      return res.status(400).json({ success: false, message: 'Invalid ID' });
+    }
+
+    const apartment = await Apartment.findById(req.params.id).populate('property');
+    if (!apartment) {
+      return res.status(404).json({ success: false, message: 'Apartment not found' });
+    }
+
+    if (apartment.property.owner.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized for this apartment' });
+    }
+
+    const mediaItem = apartment.media.id(req.params.mediaId);
+    if (!mediaItem) {
+      return res.status(404).json({ success: false, message: 'Media item not found' });
+    }
+
+    const wasCover = mediaItem.isCover || (apartment.coverPhoto === mediaItem.url);
+    if (mediaItem.publicId) {
+      await deleteFromStorage(mediaItem.publicId, mediaItem.type === 'video' ? 'video' : 'image');
+    }
+
+    apartment.media.pull({ _id: req.params.mediaId });
+    apartment.images = apartment.images.filter(img => img.url !== mediaItem.url && (!mediaItem.publicId || img.publicId !== mediaItem.publicId));
+
+    if (wasCover) {
+      const nextImg = apartment.media.find(m => m.type === 'image');
+      apartment.coverPhoto = nextImg ? nextImg.url : '';
+      if (nextImg) nextImg.isCover = true;
+    }
+
+    await apartment.save();
+    res.status(200).json({ success: true, message: 'Media deleted', coverPhoto: apartment.coverPhoto, data: apartment.media });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Set cover photo for Apartment
+// @route   PATCH /api/v1/apartments/:id/media/:mediaId/cover
+// @access  Private (Owner Only)
+exports.setApartmentCoverPhoto = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id) || !mongoose.Types.ObjectId.isValid(req.params.mediaId)) {
+      return res.status(400).json({ success: false, message: 'Invalid ID' });
+    }
+
+    const apartment = await Apartment.findById(req.params.id).populate('property');
+    if (!apartment) return res.status(404).json({ success: false, message: 'Apartment not found' });
+    if (apartment.property.owner.toString() !== req.user.id) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+    const target = apartment.media.id(req.params.mediaId);
+    if (!target) return res.status(404).json({ success: false, message: 'Media not found' });
+    if (target.type !== 'image') return res.status(400).json({ success: false, message: 'Only images can be cover photo' });
+
+    apartment.media.forEach(m => { m.isCover = (m._id.toString() === req.params.mediaId); });
+    apartment.coverPhoto = target.url;
+
+    await apartment.save();
+    res.status(200).json({ success: true, message: 'Cover photo updated', coverPhoto: apartment.coverPhoto, data: apartment.media });
   } catch (error) {
     next(error);
   }

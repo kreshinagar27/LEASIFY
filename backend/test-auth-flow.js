@@ -1,6 +1,6 @@
 const http = require('http');
 
-const API_PORT = 5000;
+const API_PORT = process.env.PORT || 5001;
 const BASE_URL = `http://localhost:${API_PORT}/api/v1`;
 
 // Helper function for HTTP requests using native http module
@@ -82,9 +82,10 @@ async function runTests() {
     });
     assert(badTenantPassword.status === 401 && badTenantPassword.body.message === 'Incorrect password', 'Granular Error: Incorrect password (401)');
 
-    // 5. Valid Owner Login (admin@leasify.com / Admin@123)
+    // 5. Valid Owner Login (dakshvashistha1369@gmail.com / Admin@123)
+    const ownerEmail = process.env.OWNER_EMAIL || 'dakshvashistha1369@gmail.com';
     const ownerLogin = await request('POST', '/auth/login-owner', {
-      email: 'admin@leasify.com',
+      email: ownerEmail,
       password: 'Admin@123'
     });
     assert(

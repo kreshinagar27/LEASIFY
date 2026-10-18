@@ -5,10 +5,10 @@
 const connectDB = require('../backend/config/db');
 const Owner = require('../backend/models/Owner');
 
-const OWNER_EMAIL = process.env.OWNER_EMAIL || 'kreshinagar27@gmail.com';
+const OWNER_EMAIL = (process.env.OWNER_EMAIL || 'dakshvashistha1369@gmail.com').trim().toLowerCase();
 const OWNER_PASSWORD = process.env.OWNER_PASSWORD || 'Admin@123';
-const OWNER_NAME = process.env.OWNER_NAME || 'Kreshi Nagar';
-const OWNER_CONTACT = process.env.OWNER_CONTACT || '0123456789';
+const OWNER_NAME = process.env.OWNER_NAME || 'Daksh Vashistha';
+const OWNER_CONTACT = process.env.OWNER_CONTACT || '+91 9876543210';
 
 (async () => {
   try {

@@ -6,11 +6,13 @@ import Layout from './components/Layout';
 // Import pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+import RegisterTenant from './pages/RegisterTenant';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Properties from './pages/Properties';
+import PropertyDetail from './pages/PropertyDetail';
 import Apartments from './pages/Apartments';
 import Tenants from './pages/Tenants';
 import TenantDetail from './pages/TenantDetail';
@@ -22,17 +24,33 @@ import CalendarView from './pages/CalendarView';
 import AuditLogs from './pages/AuditLogs';
 import Profile from './pages/Profile';
 import Search from './pages/Search';
+import Landing from './pages/Landing';
+
+// Home Route: Shows public Landing page for guests, Dashboard for logged-in users
+const HomeRoute = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  if (!user) {
+    return <Landing />;
+  }
+
+  return (
+    <Layout>
+      <Dashboard />
+    </Layout>
+  );
+};
 
 // Protected Route Guard Wrapper
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return null;
   }
 
   if (!user) {
@@ -51,11 +69,7 @@ const GuestRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return null;
   }
 
   if (user) {
@@ -68,16 +82,19 @@ const GuestRoute = ({ children }) => {
 const App = () => {
   return (
     <Routes>
-      {/* Guest Authentication Routes */}
+      {/* Public Landing & Guest Authentication Routes */}
+      <Route path="/" element={<HomeRoute />} />
+      <Route path="/landing" element={<Landing />} />
       <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+      <Route path="/register-tenant" element={<GuestRoute><RegisterTenant /></GuestRoute>} />
       <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
       <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
       <Route path="/verify-email" element={<GuestRoute><VerifyEmail /></GuestRoute>} />
 
-      {/* Unified Protected Dashboard */}
+      {/* Role Dashboards */}
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <ProtectedRoute>
             <Dashboard />
@@ -147,7 +164,7 @@ const App = () => {
       <Route
         path="/tenants/:id"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={['owner']}>
             <TenantDetail />
           </ProtectedRoute>
         }

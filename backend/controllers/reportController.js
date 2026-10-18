@@ -1,4 +1,5 @@
 const Property = require('../models/Property');
+const Apartment = require('../models/Apartment');
 const Tenant = require('../models/Tenant');
 const Bill = require('../models/Bill');
 const Payment = require('../models/Payment');
@@ -16,7 +17,17 @@ exports.getOwnerDashboard = async (req, res, next) => {
     const properties = await Property.find({ owner: ownerId });
     const propertyIds = properties.map(p => p._id);
     
-    const tenants = await Tenant.find({ owner: ownerId, isActive: true });
+    const allTenants = await Tenant.find({ owner: ownerId });
+    const totalTenants = allTenants.length;
+    const activeTenants = allTenants.filter(t => t.isActive).length;
+    const inactiveTenants = totalTenants - activeTenants;
+
+    const apartments = await Apartment.find({ property: { $in: propertyIds } });
+    const totalApartments = apartments.length;
+    const vacantApartments = apartments.filter(a => a.status === 'Vacant').length;
+    const occupiedApartments = apartments.filter(a => a.status === 'Occupied').length;
+
+    const tenants = allTenants.filter(t => t.isActive);
     const tenantIds = tenants.map(t => t._id);
 
     // Property stats
@@ -163,6 +174,12 @@ exports.getOwnerDashboard = async (req, res, next) => {
         maintenanceProperties,
         reservedProperties,
         occupancyRate,
+        totalTenants,
+        activeTenants,
+        inactiveTenants,
+        totalApartments,
+        vacantApartments,
+        occupiedApartments,
         expectedMonthlyIncome,
         receivedRent,
         pendingRent,

@@ -63,6 +63,19 @@ const OwnerSchema = new mongoose.Schema({
   ]
 }, { timestamps: true });
 
+// Ensure only one owner can ever exist in the system
+OwnerSchema.pre('validate', async function (next) {
+  if (this.isNew) {
+    const existingCount = await mongoose.model('Owner').countDocuments();
+    if (existingCount >= 1) {
+      const err = new Error('An owner account already exists.');
+      err.statusCode = 400;
+      return next(err);
+    }
+  }
+  next();
+});
+
 // Hash password before saving
 OwnerSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {

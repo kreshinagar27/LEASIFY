@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -34,17 +34,28 @@ export const CashFlowChart = ({ labels, data }) => {
   const isDark = theme === 'dark';
 
   const chartData = {
-    labels: labels || ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+    labels: labels || ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
     datasets: [
       {
         fill: true,
-        label: 'Received Revenue (INR)',
-        data: data || [12000, 19000, 15000, 25000, 22000, 30000],
-        borderColor: '#6366f1',
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-        tension: 0.4,
-        pointBackgroundColor: '#4f46e5',
-        pointHoverRadius: 7
+        label: 'Collected Rent (₹)',
+        data: data || [48000, 52000, 50000, 68000, 64000, 75000],
+        borderColor: '#4A1715',
+        backgroundColor: (context) => {
+          const ctx = context.chart.ctx;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+          gradient.addColorStop(0, 'rgba(74, 23, 21, 0.30)');
+          gradient.addColorStop(1, 'rgba(74, 23, 21, 0.0)');
+          return gradient;
+        },
+        borderWidth: 2.5,
+        tension: 0.38,
+        pointBackgroundColor: '#4A1715',
+        pointBorderColor: isDark ? '#1C1614' : '#FAF7F1',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointHoverBackgroundColor: '#642522'
       }
     ]
   };
@@ -58,11 +69,18 @@ export const CashFlowChart = ({ labels, data }) => {
       },
       tooltip: {
         padding: 12,
-        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-        titleColor: isDark ? '#f8fafc' : '#0f172a',
-        bodyColor: isDark ? '#94a3b8' : '#475569',
-        borderColor: 'rgba(99, 102, 241, 0.2)',
-        borderWidth: 1
+        cornerRadius: 12,
+        backgroundColor: isDark ? 'rgba(28, 22, 20, 0.95)' : 'rgba(250, 247, 241, 0.98)',
+        titleColor: isDark ? '#FAF7F1' : '#38251F',
+        bodyColor: isDark ? '#C5B5A5' : '#78685D',
+        borderColor: isDark ? '#38251F' : '#D9CBBB',
+        borderWidth: 1,
+        titleFont: { size: 12, weight: 'bold' },
+        bodyFont: { size: 12 },
+        displayColors: false,
+        callbacks: {
+          label: (context) => `Revenue: ₹${Number(context.raw || 0).toLocaleString()}`
+        }
       }
     },
     scales: {
@@ -71,17 +89,18 @@ export const CashFlowChart = ({ labels, data }) => {
           display: false
         },
         ticks: {
-          color: isDark ? '#64748b' : '#94a3b8',
-          font: { size: 11 }
+          color: isDark ? '#A8998C' : '#78685D',
+          font: { size: 11, weight: '500' }
         }
       },
       y: {
         grid: {
-          color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+          color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(56,37,31,0.06)'
         },
         ticks: {
-          color: isDark ? '#64748b' : '#94a3b8',
-          font: { size: 11 }
+          color: isDark ? '#A8998C' : '#78685D',
+          font: { size: 11, weight: '500' },
+          callback: (value) => `₹${value >= 1000 ? `${value / 1000}k` : value}`
         }
       }
     }
@@ -99,20 +118,21 @@ export const ComplaintsDistributionChart = ({ labels, data }) => {
   const isDark = theme === 'dark';
 
   const chartData = {
-    labels: labels || ['Electrical', 'Water', 'Plumbing', 'Cleaning', 'Internet', 'Others'],
+    labels: labels || ['Electrical', 'Water & Plumbing', 'Carpentry', 'Cleaning', 'Security', 'Other'],
     datasets: [
       {
-        data: data || [4, 2, 5, 1, 2, 3],
+        data: data || [5, 3, 4, 2, 1, 2],
         backgroundColor: [
-          '#6366f1', // Indigo
-          '#3b82f6', // Blue
-          '#10b981', // Emerald
-          '#f59e0b', // Amber
-          '#ec4899', // Pink
-          '#6b7280'  // Gray
+          '#4A1715', // Deep Mahogany
+          '#B45309', // Warm Amber
+          '#047857', // Forest Sage
+          '#C2410C', // Terracotta Rust
+          '#854D0E', // Golden Umber
+          '#78350F'  // Rich Espresso
         ],
-        borderWidth: isDark ? 1 : 2,
-        borderColor: isDark ? '#0f172a' : '#ffffff'
+        borderWidth: 2,
+        borderColor: isDark ? '#1C1614' : '#FAF7F1',
+        hoverOffset: 6
       }
     ]
   };
@@ -124,24 +144,29 @@ export const ComplaintsDistributionChart = ({ labels, data }) => {
       legend: {
         position: 'right',
         labels: {
-          color: isDark ? '#94a3b8' : '#475569',
-          font: { size: 11 },
-          boxWidth: 12
+          color: isDark ? '#E9DFD0' : '#38251F',
+          font: { size: 11, weight: '600' },
+          boxWidth: 12,
+          padding: 12,
+          usePointStyle: true,
+          pointStyle: 'circle'
         }
       },
       tooltip: {
         padding: 10,
-        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-        titleColor: isDark ? '#f8fafc' : '#0f172a',
-        bodyColor: isDark ? '#94a3b8' : '#475569',
+        cornerRadius: 12,
+        backgroundColor: isDark ? 'rgba(28, 22, 20, 0.95)' : 'rgba(250, 247, 241, 0.98)',
+        titleColor: isDark ? '#FAF7F1' : '#38251F',
+        bodyColor: isDark ? '#C5B5A5' : '#78685D',
         borderWidth: 1,
-        borderColor: 'rgba(99, 102, 241, 0.1)'
+        borderColor: isDark ? '#38251F' : '#D9CBBB'
       }
-    }
+    },
+    cutout: '68%'
   };
 
   return (
-    <div className="h-60 w-full flex items-center justify-center">
+    <div className="h-64 w-full flex items-center justify-center">
       <Doughnut data={chartData} options={options} />
     </div>
   );
@@ -152,15 +177,22 @@ export const PropertyYieldChart = ({ labels, data }) => {
   const isDark = theme === 'dark';
 
   const chartData = {
-    labels: labels || ['Property A', 'Property B', 'Property C'],
+    labels: labels || ['Sunset Residency', 'Skyline Tower', 'Emerald Heights'],
     datasets: [
       {
-        label: 'Revenue Earned (INR)',
-        data: data || [45000, 30000, 15000],
-        backgroundColor: 'rgba(99, 102, 241, 0.75)',
-        borderColor: '#6366f1',
-        borderWidth: 1,
-        borderRadius: 8
+        label: 'Monthly Yield (₹)',
+        data: data || [55000, 38000, 24000],
+        backgroundColor: (context) => {
+          const ctx = context.chart.ctx;
+          const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+          gradient.addColorStop(0, '#4A1715');
+          gradient.addColorStop(1, '#8B3A2B');
+          return gradient;
+        },
+        borderColor: '#4A1715',
+        borderWidth: 0,
+        borderRadius: 10,
+        hoverBackgroundColor: '#642522'
       }
     ]
   };
@@ -174,28 +206,33 @@ export const PropertyYieldChart = ({ labels, data }) => {
       },
       tooltip: {
         padding: 10,
-        backgroundColor: isDark ? '#0f172a' : '#ffffff',
-        titleColor: isDark ? '#f8fafc' : '#0f172a',
-        bodyColor: isDark ? '#94a3b8' : '#475569',
+        cornerRadius: 10,
+        backgroundColor: isDark ? 'rgba(28, 22, 20, 0.95)' : 'rgba(250, 247, 241, 0.98)',
+        titleColor: isDark ? '#FAF7F1' : '#38251F',
+        bodyColor: isDark ? '#C5B5A5' : '#78685D',
         borderWidth: 1,
-        borderColor: 'rgba(99, 102, 241, 0.1)'
+        borderColor: isDark ? '#38251F' : '#D9CBBB',
+        callbacks: {
+          label: (context) => `Yield: ₹${Number(context.raw || 0).toLocaleString()}`
+        }
       }
     },
     scales: {
       x: {
         grid: { display: false },
         ticks: {
-          color: isDark ? '#64748b' : '#94a3b8',
-          font: { size: 10 }
+          color: isDark ? '#A8998C' : '#78685D',
+          font: { size: 10, weight: '500' }
         }
       },
       y: {
         grid: {
-          color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+          color: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(56,37,31,0.06)'
         },
         ticks: {
-          color: isDark ? '#64748b' : '#94a3b8',
-          font: { size: 10 }
+          color: isDark ? '#A8998C' : '#78685D',
+          font: { size: 10, weight: '500' },
+          callback: (value) => `₹${value >= 1000 ? `${value / 1000}k` : value}`
         }
       }
     }

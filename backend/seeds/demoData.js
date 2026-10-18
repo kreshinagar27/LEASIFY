@@ -8,6 +8,7 @@ dotenv.config({ path: path.join(__dirname, '../.env') });
 const Owner = require('../models/Owner');
 const Tenant = require('../models/Tenant');
 const Property = require('../models/Property');
+const Apartment = require('../models/Apartment');
 const Bill = require('../models/Bill');
 const Payment = require('../models/Payment');
 const Maintenance = require('../models/Maintenance');
@@ -21,6 +22,7 @@ const seedDB = async () => {
     // Clear dependent collections
     await Tenant.deleteMany();
     await Property.deleteMany();
+    await Apartment.deleteMany();
     await Bill.deleteMany();
     await Payment.deleteMany();
     await Maintenance.deleteMany();
@@ -28,21 +30,20 @@ const seedDB = async () => {
     await AuditLog.deleteMany();
     console.log('Cleaned old database records.');
 
-    // 1. Create or Update Demo Owner (preserve _id to maintain active JWT tokens)
+    // 1. Create or Update Primary Demo Owner (kreshinagar27@gmail.com)
     const ownerPassword = 'Admin@123';
-    let owner = await Owner.findOne({ email: 'admin@leasify.com' });
+    let owner = await Owner.findOne({ email: 'kreshinagar27@gmail.com' });
     if (owner) {
-      owner.name = 'Admin Owner';
+      owner.name = 'Kreshi Nagar';
       owner.password = ownerPassword;
       owner.contactNumber = '+91 9876543210';
       owner.address = 'Suite 101, Residency Road, Indiranagar, Bengaluru, KA, India';
       owner.verified = true;
       await owner.save();
     } else {
-      await Owner.deleteMany({});
       owner = await Owner.create({
-        name: 'Admin Owner',
-        email: 'admin@leasify.com',
+        name: 'Kreshi Nagar',
+        email: 'kreshinagar27@gmail.com',
         password: ownerPassword,
         contactNumber: '+91 9876543210',
         address: 'Suite 101, Residency Road, Indiranagar, Bengaluru, KA, India',
@@ -51,7 +52,8 @@ const seedDB = async () => {
         verified: true
       });
     }
-    console.log(`Demo Owner Verified: admin@leasify.com / ${ownerPassword}`);
+
+    console.log(`Single Demo Owner Verified: ${owner.email} / ${ownerPassword}`);
 
     // 2. Create 5 Properties
     const propertyData = [
@@ -225,6 +227,44 @@ const seedDB = async () => {
     }
     console.log(`Created ${tenants.length} Tenants.`);
 
+    // 3.5 Create Apartments for Properties
+    const apartments = [];
+    const aptConfigs = [
+      { number: 'Apt 402', floor: 4, areaSqFt: 1250, bedrooms: 2, bathrooms: 2, propIdx: 0, tenantIdx: 0, status: 'Occupied' },
+      { number: 'Apt 403', floor: 4, areaSqFt: 1250, bedrooms: 2, bathrooms: 2, propIdx: 0, tenantIdx: null, status: 'Vacant' },
+      { number: 'Apt 404', floor: 4, areaSqFt: 1100, bedrooms: 2, bathrooms: 1, propIdx: 0, tenantIdx: null, status: 'Reserved' },
+      { number: 'Villa 12', floor: 0, areaSqFt: 3400, bedrooms: 4, bathrooms: 4, propIdx: 1, tenantIdx: 3, status: 'Occupied' },
+      { number: 'Villa 14', floor: 0, areaSqFt: 3400, bedrooms: 4, bathrooms: 4, propIdx: 1, tenantIdx: null, status: 'Vacant' },
+      { number: 'Suite 8B', floor: 8, areaSqFt: 1800, bedrooms: 3, bathrooms: 3, propIdx: 2, tenantIdx: 6, status: 'Occupied' },
+      { number: 'Suite 8C', floor: 8, areaSqFt: 1800, bedrooms: 3, bathrooms: 3, propIdx: 2, tenantIdx: null, status: 'Vacant' },
+      { number: 'Office 304', floor: 3, areaSqFt: 2200, bedrooms: 0, bathrooms: 2, propIdx: 3, tenantIdx: 9, status: 'Occupied' },
+      { number: 'Office 305', floor: 3, areaSqFt: 1800, bedrooms: 0, bathrooms: 2, propIdx: 3, tenantIdx: null, status: 'Vacant' },
+      { number: 'Studio 105', floor: 1, areaSqFt: 650, bedrooms: 1, bathrooms: 1, propIdx: 4, tenantIdx: 12, status: 'Occupied' },
+      { number: 'Studio 106', floor: 1, areaSqFt: 650, bedrooms: 1, bathrooms: 1, propIdx: 4, tenantIdx: null, status: 'Vacant' }
+    ];
+
+    for (const cfg of aptConfigs) {
+      const prop = properties[cfg.propIdx];
+      const assignedTenant = cfg.tenantIdx !== null ? tenants[cfg.tenantIdx] : null;
+      const apt = await Apartment.create({
+        number: cfg.number,
+        floor: cfg.floor,
+        areaSqFt: cfg.areaSqFt,
+        bedrooms: cfg.bedrooms,
+        bathrooms: cfg.bathrooms,
+        balcony: true,
+        parkingAvailable: true,
+        furnishedStatus: prop.furnishedStatus || 'furnished',
+        monthlyRent: prop.monthlyRent,
+        securityDeposit: prop.securityDeposit,
+        status: cfg.status,
+        property: prop._id,
+        tenant: assignedTenant ? assignedTenant._id : null
+      });
+      apartments.push(apt);
+    }
+    console.log(`Created ${apartments.length} Apartments.`);
+
     // 4. Create Rent Bills & Payment Records (STEP 9 requirement)
     let billCount = 0;
     let paymentCount = 0;
@@ -352,8 +392,34 @@ const seedDB = async () => {
       user: owner._id,
       userModel: 'Owner',
       title: 'Portfolio Initialized',
-      message: 'System loaded 5 properties and 15 tenant resident profiles successfully.',
+      message: 'System loaded 5 properties, 11 apartments, and 15 tenant resident profiles successfully.',
       category: 'lease'
+    });
+
+    await Notification.create({
+      user: owner._id,
+      userModel: 'Owner',
+      title: 'Rent Collected',
+      message: '₹25,000 rent payment received from Anjali Sharma for Greenwood Residency Apt 402.',
+      category: 'billing'
+    });
+
+    // Notifications for Tenant Anjali Sharma
+    const tenant1 = tenants[0];
+    await Notification.create({
+      user: tenant1._id,
+      userModel: 'Tenant',
+      title: 'Rent Bill Generated',
+      message: 'Your rent bill for July 2026 has been generated. Due date: July 10, 2026.',
+      category: 'billing'
+    });
+
+    await Notification.create({
+      user: tenant1._id,
+      userModel: 'Tenant',
+      title: 'Payment Confirmed',
+      message: 'June 2026 rent payment of ₹29,500 has been verified. Receipt is available for download.',
+      category: 'billing'
     });
 
     await AuditLog.create({

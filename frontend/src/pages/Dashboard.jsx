@@ -17,7 +17,15 @@ import {
   Phone,
   CalendarDays,
   Clock,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  ArrowRight,
+  ArrowUpRight,
+  CheckCircle2,
+  Sparkles,
+  Layers,
+  AlertCircle,
+  FileText
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -51,122 +59,341 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="space-y-6 animate-pulse">
-        <div className="h-10 w-48 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="h-28 bg-[#E9DFD0]/60 dark:bg-[#2A1D18]/60 rounded-3xl"></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(n => (
-            <div key={n} className="h-28 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+            <div key={n} className="h-32 bg-[#E9DFD0]/50 dark:bg-[#2A1D18]/50 rounded-2xl"></div>
           ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="h-72 lg:col-span-2 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-          <div className="h-72 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+          <div className="h-80 lg:col-span-2 bg-[#E9DFD0]/50 dark:bg-[#2A1D18]/50 rounded-3xl"></div>
+          <div className="h-80 bg-[#E9DFD0]/50 dark:bg-[#2A1D18]/50 rounded-3xl"></div>
         </div>
       </div>
     );
   }
 
-  if (user.role === 'owner') {
-    // ==========================================
-    // OWNER DASHBOARD RENDER
-    // ==========================================
+  // =========================================================================
+  // 1. PROPERTY OWNER DASHBOARD
+  // =========================================================================
+  if (user?.role === 'owner') {
     const stats = data?.stats || {};
     const recentPayments = data?.recentPayments || [];
     const recentActivities = data?.recentActivities || [];
     const charts = data?.charts || {};
 
+    const formattedExpected = stats.expectedMonthlyIncome ? Number(stats.expectedMonthlyIncome).toLocaleString() : '0';
+    const formattedReceived = stats.receivedRent ? Number(stats.receivedRent).toLocaleString() : '0';
+    const totalPending = (Number(stats.pendingRent || 0) + Number(stats.overdueRent || 0)).toLocaleString();
+
     return (
       <div className="space-y-6">
-        {/* Title greeting */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-black text-slate-800 dark:text-white Outfit">Owner Dashboard</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Welcome, {user?.name?.split(' ')[0] || 'Landlord'}. Here is a summary of your portfolio yield.</p>
+        {/* Welcome Hero Banner */}
+        <div className="glass-panel-elevated p-6 sm:p-8 rounded-[2rem] border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] relative overflow-hidden shadow-sm">
+          <div className="absolute right-0 top-0 w-96 h-96 bg-[#D97706]/10 dark:bg-[#4A1715]/30 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#E6DACC] dark:bg-[#352920] text-[#4A1917] dark:text-[#D1C1B0] text-xs font-bold mb-3 border border-[#D9CABB] dark:border-[rgba(230,211,191,0.15)]">
+                <Sparkles className="w-3.5 h-3.5 text-brand-600" />
+                <span>Executive Portfolio Overview</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-[#39251F] dark:text-[#F6EEE3] Outfit tracking-tight">
+                Welcome back, {user?.name?.split(' ')[0] || 'Landlord'}! 👋
+              </h1>
+              <p className="text-xs sm:text-sm text-[#77665A] dark:text-[#D1C1B0] mt-1 max-w-xl">
+                Here is your live real estate performance snapshot. Occupancy is at{' '}
+                <span className="font-bold text-emerald-700 dark:text-emerald-400">{stats.occupancyRate || 0}%</span>{' '}
+                with <span className="font-bold text-brand-600 dark:text-brand-300">{stats.occupiedProperties || 0} active units</span>.
+              </p>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Link
+                to="/properties"
+                className="inline-flex items-center gap-2 px-4 py-2.5 btn-primary-glow text-[#FAF7F1] text-xs font-bold rounded-full shadow-md transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Property</span>
+              </Link>
+              <Link
+                to="/bills"
+                className="inline-flex items-center gap-2 px-4 py-2.5 glass-panel text-[#39251F] dark:text-[#F6EEE3] hover:text-[#4A1917] text-xs font-bold rounded-full border border-[#D9CABB]/80 dark:border-[rgba(230,211,191,0.15)] transition-all hover:bg-[#E6DACC]/60 cursor-pointer shadow-xs"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Generate Invoices</span>
+              </Link>
+              <Link
+                to="/tenants"
+                className="inline-flex items-center gap-2 px-4 py-2.5 glass-panel text-[#39251F] dark:text-[#F6EEE3] hover:text-[#4A1917] text-xs font-bold rounded-full border border-[#D9CABB]/80 dark:border-[rgba(230,211,191,0.15)] transition-all hover:bg-[#E6DACC]/60 cursor-pointer shadow-xs"
+              >
+                <Users className="w-4 h-4" />
+                <span>Manage Tenants</span>
+              </Link>
+            </div>
           </div>
-          <span className="text-xs font-mono text-slate-400">Current Period: {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
         </div>
 
-        {/* Primary Stats Grid */}
+        {/* Primary Metric KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="glass-panel p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Expected monthly Rent</span>
-              <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-1">INR {stats.expectedMonthlyIncome?.toLocaleString() || 0}</h3>
-              <span className="text-[9px] text-brand-500 mt-1 block flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />Occupancy Yield</span>
+          {/* Expected Rent */}
+          <div className="glass-panel-elevated p-5 rounded-2xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between glass-card-hover relative group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Expected Rent
+              </span>
+              <div className="p-2.5 rounded-xl bg-[#E6DACC] dark:bg-[#352920] text-brand-600 dark:text-brand-300 group-hover:scale-110 transition-transform">
+                <Building className="w-5 h-5" />
+              </div>
             </div>
-            <div className="p-3 bg-brand-500/10 text-brand-500 rounded-xl"><Building className="w-6 h-6" /></div>
+            <div>
+              <div className="text-2xl font-black text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                ₹{formattedExpected}
+              </div>
+              <div className="flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-brand-600 dark:text-brand-400">
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>Current Month Yield</span>
+              </div>
+            </div>
           </div>
 
-          <div className="glass-panel p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Rent Received</span>
-              <h3 className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">INR {stats.receivedRent?.toLocaleString() || 0}</h3>
-              <span className="text-[9px] text-slate-400 mt-1 block">Collection Rate: {stats.rentCollectionRate}%</span>
+          {/* Rent Received */}
+          <div className="glass-panel-elevated p-5 rounded-2xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between glass-card-hover relative group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Collected Rent
+              </span>
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 group-hover:scale-110 transition-transform">
+                <CreditCard className="w-5 h-5" />
+              </div>
             </div>
-            <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl"><CreditCard className="w-6 h-6" /></div>
+            <div>
+              <div className="text-2xl font-black text-emerald-700 dark:text-emerald-400 Outfit">
+                ₹{formattedReceived}
+              </div>
+              <div className="flex items-center justify-between mt-2 text-[11px]">
+                <span className="font-semibold text-[#77665A] dark:text-[#D1C1B0]">Collection Rate</span>
+                <span className="font-black text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                  {stats.rentCollectionRate || 0}%
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="glass-panel p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pending / Overdue</span>
-              <h3 className="text-xl font-bold text-red-500 mt-1">INR {(stats.pendingRent + stats.overdueRent)?.toLocaleString() || 0}</h3>
-              <span className="text-[9px] text-slate-400 mt-1 block">Late Fee applied</span>
+          {/* Overdue / Pending */}
+          <div className="glass-panel-elevated p-5 rounded-2xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between glass-card-hover relative group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Pending & Overdue
+              </span>
+              <div className="p-2.5 rounded-xl bg-rose-500/10 text-rose-700 dark:text-rose-400 group-hover:scale-110 transition-transform">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
             </div>
-            <div className="p-3 bg-red-500/10 text-red-500 rounded-xl"><AlertTriangle className="w-6 h-6" /></div>
+            <div>
+              <div className="text-2xl font-black text-rose-700 dark:text-rose-400 Outfit">
+                ₹{totalPending}
+              </div>
+              <div className="flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-rose-600">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>Requires follow-up</span>
+              </div>
+            </div>
           </div>
 
-          <div className="glass-panel p-4 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Occupancy Rate</span>
-              <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-1">{stats.occupancyRate}%</h3>
-              <span className="text-[9px] text-slate-400 mt-1 block">Units: {stats.occupiedProperties}/{stats.totalProperties}</span>
+          {/* Occupancy Rate */}
+          <div className="glass-panel-elevated p-5 rounded-2xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between glass-card-hover relative group">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Occupancy Rate
+              </span>
+              <div className="p-2.5 rounded-xl bg-[#E6DACC] dark:bg-[#352920] text-[#4A1917] dark:text-[#D1C1B0] group-hover:scale-110 transition-transform">
+                <Users className="w-5 h-5" />
+              </div>
             </div>
-            <div className="p-3 bg-purple-500/10 text-purple-500 rounded-xl"><Users className="w-6 h-6" /></div>
+            <div>
+              <div className="text-2xl font-black text-[#38251F] dark:text-[#FAF7F1] Outfit">
+                {stats.occupancyRate || 0}%
+              </div>
+              <div className="w-full bg-[#E9DFD0] dark:bg-[#2A1D18] h-2 rounded-full mt-2 overflow-hidden">
+                <div
+                  className="bg-brand-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, stats.occupancyRate || 0)}%` }}
+                />
+              </div>
+              <div className="flex justify-between items-center text-[10px] text-[#78685D] mt-1.5">
+                <span>Units Occupied</span>
+                <span className="font-bold text-[#38251F] dark:text-[#FAF7F1]">
+                  {stats.occupiedProperties || 0}/{stats.totalProperties || 0}
+                </span>
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* Portfolio Status Indicators (3 Columns) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Link
+            to="/tenants"
+            className="glass-panel-elevated p-4 rounded-2xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex items-center justify-between glass-card-hover group cursor-pointer"
+          >
+            <div>
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Total Tenants
+              </span>
+              <h3 className="text-xl font-black text-[#39251F] dark:text-[#F6EEE3] Outfit mt-1 group-hover:text-brand-600 transition-colors">
+                {stats.totalTenants ?? stats.occupiedProperties ?? 0}
+              </h3>
+              <span className="text-[10px] text-[#77665A] dark:text-[#AA9886] mt-0.5 block">
+                Active tenant profiles
+              </span>
+            </div>
+            <div className="p-3 bg-[#E6DACC] text-brand-600 dark:bg-[#352920] dark:text-brand-300 rounded-xl group-hover:scale-105 transition-transform">
+              <Users className="w-5 h-5" />
+            </div>
+          </Link>
+
+          <Link
+            to="/tenants"
+            className="glass-panel-elevated p-4 rounded-2xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex items-center justify-between glass-card-hover group cursor-pointer"
+          >
+            <div>
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Active Leases
+              </span>
+              <h3 className="text-xl font-black text-emerald-700 dark:text-emerald-400 Outfit mt-1">
+                {stats.activeTenants ?? stats.occupiedProperties ?? 0}
+              </h3>
+              <span className="text-[10px] text-[#77665A] dark:text-[#AA9886] mt-0.5 block">
+                {stats.inactiveTenants || 0} expired/pending
+              </span>
+            </div>
+            <div className="p-3 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-xl group-hover:scale-105 transition-transform">
+              <FileCheck className="w-5 h-5" />
+            </div>
+          </Link>
+
+          <Link
+            to="/apartments"
+            className="glass-panel-elevated p-4 rounded-2xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex items-center justify-between glass-card-hover group cursor-pointer"
+          >
+            <div>
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Vacant Units
+              </span>
+              <h3 className="text-xl font-black text-amber-600 dark:text-amber-400 Outfit mt-1">
+                {stats.vacantApartments ?? stats.vacantProperties ?? 0}
+              </h3>
+              <span className="text-[10px] text-[#77665A] dark:text-[#AA9886] mt-0.5 block">
+                Available for listing
+              </span>
+            </div>
+            <div className="p-3 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-xl group-hover:scale-105 transition-transform">
+              <Building className="w-5 h-5" />
+            </div>
+          </Link>
         </div>
 
         {/* Graphical Analytics Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 glass-panel rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
-            <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200 mb-4">Cash Flow History (Last 6 Months)</h4>
+          <div className="lg:col-span-2 glass-panel-elevated rounded-3xl p-6 border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)]">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h4 className="font-extrabold text-base text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                  Revenue Collection Trend
+                </h4>
+                <p className="text-xs text-[#77665A] dark:text-[#D1C1B0]">
+                  Monthly cash flow collections over the last 6 months
+                </p>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#E6DACC] text-[#4A1917] dark:bg-[#352920] dark:text-[#D1C1B0] border border-[#D9CABB] dark:border-[rgba(230,211,191,0.15)]">
+                INR (₹)
+              </span>
+            </div>
             <CashFlowChart labels={charts.cashFlow?.labels} data={charts.cashFlow?.data} />
           </div>
-          
-          <div className="glass-panel rounded-2xl p-4 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-            <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200 mb-2">Complaint Categories</h4>
+
+          <div className="glass-panel-elevated rounded-3xl p-6 border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between">
+            <div className="mb-4">
+              <h4 className="font-extrabold text-base text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                Ticket Categories
+              </h4>
+              <p className="text-xs text-[#77665A] dark:text-[#D1C1B0]">
+                Maintenance requests distribution
+              </p>
+            </div>
             <ComplaintsDistributionChart labels={charts.complaints?.labels} data={charts.complaints?.data} />
           </div>
         </div>
 
-        {/* Secondary Charts / Top properties revenue */}
+        {/* Secondary Charts & Activity Logs */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="glass-panel rounded-2xl p-4 border border-slate-200 dark:border-slate-800">
-            <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200 mb-4">Top Yield Properties (INR)</h4>
+          {/* Top Yielding Properties */}
+          <div className="glass-panel-elevated rounded-3xl p-6 border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)]">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h4 className="font-extrabold text-base text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                  Top Yielding Properties
+                </h4>
+                <p className="text-xs text-[#77665A] dark:text-[#D1C1B0]">Revenue per asset</p>
+              </div>
+              <Link to="/properties" className="text-xs text-brand-600 dark:text-brand-400 font-bold hover:underline flex items-center gap-0.5">
+                All <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
             <PropertyYieldChart labels={charts.propertyYield?.labels} data={charts.propertyYield?.data} />
           </div>
 
-          {/* Recent Payments Ledger */}
-          <div className="glass-panel rounded-2xl p-4 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+          {/* Recent Collections Feed */}
+          <div className="glass-panel-elevated rounded-3xl p-6 border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center mb-4">
-                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Recent Collections</h4>
-                <Link to="/payments" className="text-xs text-brand-500 hover:underline">View All</Link>
+                <div>
+                  <h4 className="font-extrabold text-base text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                    Recent Collections
+                  </h4>
+                  <p className="text-xs text-[#77665A] dark:text-[#D1C1B0]">Latest settled invoices</p>
+                </div>
+                <Link to="/payments" className="text-xs text-brand-600 dark:text-brand-400 font-bold hover:underline">
+                  View Ledger
+                </Link>
               </div>
-              <div className="space-y-3">
+
+              <div className="space-y-2.5">
                 {recentPayments.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-6">No collections logged.</p>
+                  <div className="text-center py-8 text-xs text-[#78685D]">
+                    <CreditCard className="w-6 h-6 mx-auto mb-1.5 opacity-30" />
+                    No collections logged yet.
+                  </div>
                 ) : (
-                  recentPayments.map((pay, i) => (
-                    <div key={i} className="flex justify-between items-center text-xs p-2 rounded-xl bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200/50 dark:border-slate-800/50">
-                      <div className="flex items-center gap-2">
-                        <img src={pay.tenant?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=50'} alt="" className="w-8 h-8 rounded-full object-cover" />
-                        <div>
-                          <p className="font-semibold text-slate-700 dark:text-slate-300">{pay.tenant?.name || 'Moved Tenant'}</p>
-                          <p className="text-[10px] text-slate-400">{pay.property?.name}</p>
+                  recentPayments.slice(0, 5).map((pay, i) => (
+                    <div
+                      key={i}
+                      className="flex justify-between items-center text-xs p-3 rounded-2xl bg-[#E9DFD0]/40 dark:bg-[#2A1D18]/40 border border-[#D9CBBB]/60 dark:border-[#38251F] hover:border-brand-500/40 transition-all"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={pay.tenant?.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=60'}
+                          alt=""
+                          className="w-9 h-9 rounded-full object-cover border border-brand-500/30 shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-bold text-[#38251F] dark:text-[#FAF7F1] truncate">
+                            {pay.tenant?.name || 'Resident Tenant'}
+                          </p>
+                          <p className="text-[10px] text-[#78685D] truncate">
+                            {pay.property?.name || 'Assigned Property'}
+                          </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="font-bold text-emerald-600 dark:text-emerald-400">+INR {pay.amount}</span>
-                        <span className="block text-[9px] text-slate-400">{new Date(pay.paymentDate).toLocaleDateString()}</span>
+                      <div className="text-right shrink-0 pl-2">
+                        <span className="font-black text-emerald-700 dark:text-emerald-400 block text-xs">
+                          +₹{Number(pay.amount || 0).toLocaleString()}
+                        </span>
+                        <span className="text-[9px] text-[#78685D] font-medium">
+                          {new Date(pay.paymentDate).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   ))
@@ -175,257 +402,456 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Activity Logs timelines */}
-          <div className="glass-panel rounded-2xl p-4 border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+          {/* Security Audits / Timeline */}
+          <div className="glass-panel-elevated rounded-3xl p-6 border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center mb-4">
-                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <Shield className="w-4 h-4 text-brand-500" /> Security Audits
-                </h4>
-                <Link to="/audit-logs" className="text-xs text-brand-500 hover:underline">Audits</Link>
+                <div>
+                  <h4 className="font-extrabold text-base text-[#39251F] dark:text-[#F6EEE3] Outfit flex items-center gap-1.5">
+                    <Shield className="w-4 h-4 text-brand-600" /> Audit Log
+                  </h4>
+                  <p className="text-xs text-[#77665A] dark:text-[#D1C1B0]">Security & system events</p>
+                </div>
+                <Link to="/audit-logs" className="text-xs text-brand-600 dark:text-brand-400 font-bold hover:underline">
+                  View All
+                </Link>
               </div>
-              <div className="space-y-3">
+
+              <div className="space-y-2.5">
                 {recentActivities.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-6">No logs generated.</p>
+                  <div className="text-center py-8 text-xs text-[#77665A]">
+                    <Shield className="w-6 h-6 mx-auto mb-1.5 opacity-30" />
+                    No recent audit entries.
+                  </div>
                 ) : (
-                  recentActivities.map((act, i) => (
-                    <div key={i} className="flex gap-2 items-start text-[11px] p-2 rounded-xl bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200/50 dark:border-slate-800/50">
-                      <History className="w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <span className="font-semibold text-slate-700 dark:text-slate-300">{act.action}</span>
-                        <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{act.description}</p>
-                        <span className="text-[9px] text-slate-400 font-mono mt-0.5 block">{new Date(act.createdAt).toLocaleTimeString()}</span>
+                  recentActivities.slice(0, 5).map((act, i) => (
+                    <div
+                      key={i}
+                      className="flex gap-2.5 items-start text-xs p-3 rounded-2xl bg-[#E6DACC]/40 dark:bg-[#352920]/40 border border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.1)]"
+                    >
+                      <History className="w-4 h-4 text-brand-600 mt-0.5 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <span className="font-bold text-[#39251F] dark:text-[#F6EEE3] block text-xs leading-snug">
+                          {act.action}
+                        </span>
+                        <p className="text-[11px] text-[#77665A] dark:text-[#D1C1B0] mt-0.5 line-clamp-2 leading-relaxed">
+                          {act.description}
+                        </p>
+                        <span className="text-[9px] text-[#968577] font-mono mt-1 block">
+                          {new Date(act.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
                       </div>
                     </div>
                   ))
                 )}
               </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  } else {
-    // ==========================================
-    // TENANT DASHBOARD RENDER
-    // ==========================================
-    const tenant = data?.tenantDetails || {};
-    const property = data?.property || null;
-    const pendingBill = data?.pendingBill || null;
-    const daysRemaining = data?.daysRemaining || 0;
-    const tStats = data?.stats || {};
-    const paymentHistory = data?.paymentHistory || [];
-    const complaintsList = data?.complaintsList || [];
-
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-black text-slate-800 dark:text-white Outfit">Welcome back, {tenant.name}</h1>
-            <p className="text-xs text-slate-500">Your portal for billing, payments, and property maintenance.</p>
-          </div>
-          {property && (
-            <span className="text-xs bg-brand-500/10 text-brand-500 px-3 py-1 rounded-full font-semibold border border-brand-500/20">
-              Resident: {property.name}
-            </span>
-          )}
-        </div>
-
-        {/* Top summary row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Rent Due Widget */}
-          <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 flex flex-col justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Next Outstanding Bill</span>
-              {pendingBill ? (
-                <div className="mt-2">
-                  <h3 className="text-2xl font-bold text-red-500">INR {pendingBill.totalAmount.toLocaleString()}</h3>
-                  <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-slate-400" /> Due: {new Date(pendingBill.dueDate).toLocaleDateString()}
-                  </p>
-                  {pendingBill.status === 'overdue' && (
-                    <span className="inline-block mt-2 text-[9px] font-bold px-2 py-0.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-full uppercase">
-                      Overdue (Late Fee Charged)
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-3 py-2 text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                  <FileCheck className="w-5 h-5" />
-                  <span className="text-sm font-semibold">Rent Account fully settled!</span>
-                </div>
-              )}
-            </div>
-            {pendingBill && (
-              <Link
-                to={`/bills`}
-                className="mt-4 w-full py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-center text-xs font-bold shadow-lg shadow-brand-500/20 transition-all block"
-              >
-                Pay Bill Online
-              </Link>
-            )}
-          </div>
-
-          {/* Lease Progress widget */}
-          <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 flex flex-col justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lease Duration Left</span>
-              <div className="mt-3">
-                <h3 className="text-2xl font-bold text-slate-800 dark:text-white">{daysRemaining} Days</h3>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  Agreement ends: {tenant.leaseEndDate ? new Date(tenant.leaseEndDate).toLocaleDateString() : 'N/A'}
-                </p>
-                {/* Visual Progress bar */}
-                <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full mt-3 overflow-hidden">
-                  <div 
-                    className="bg-brand-500 h-full rounded-full transition-all duration-500" 
-                    style={{ width: `${Math.min(100, Math.round((daysRemaining / 365) * 100))}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-            {tenant.leaseAgreementUrl && (
-              <a
-                href={tenant.leaseAgreementUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 w-full py-2 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center gap-1.5"
-              >
-                View Lease Agreement <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-            )}
-          </div>
-
-          {/* Landlord Contact Card */}
-          <div className="glass-panel p-5 rounded-2xl border border-slate-200/50 dark:border-slate-800/50 flex flex-col justify-between">
-            <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Owner Contact Info</span>
-              {property?.owner ? (
-                <div className="flex items-center gap-3 mt-3">
-                  <img
-                    src={property.owner.profilePhoto || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100'}
-                    alt="Owner"
-                    className="w-12 h-12 rounded-full object-cover border border-slate-200 dark:border-slate-800"
-                  />
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-800 dark:text-slate-100">{property.owner.name}</h4>
-                    <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">Landlord</span>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-xs text-slate-400 mt-2">Unassigned Landlord</p>
-              )}
-            </div>
-            {property?.owner && (
-              <div className="grid grid-cols-2 gap-2 mt-4">
-                <a
-                  href={`tel:${property.owner.contactNumber}`}
-                  className="py-2 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl text-center text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"
-                >
-                  <Phone className="w-3.5 h-3.5" /> Call Owner
-                </a>
-                <a
-                  href={`mailto:${property.owner.email}`}
-                  className="py-2 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 rounded-xl text-center text-xs font-bold hover:bg-slate-200 transition-colors flex items-center justify-center gap-1"
-                >
-                  <Mail className="w-3.5 h-3.5" /> Email
-                </a>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Detailed Property specs & coordinates */}
-        {property && (
-          <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
-            <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200 mb-4">Assigned Rental Unit Address</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-                <p><strong className="text-slate-800 dark:text-slate-200">Unit Type:</strong> {property.type.toUpperCase()}</p>
-                <p><strong className="text-slate-800 dark:text-slate-200">Monthly Base Rent:</strong> INR {property.monthlyRent?.toLocaleString()}</p>
-                <p><strong className="text-slate-800 dark:text-slate-200">Security Deposit:</strong> INR {property.securityDeposit?.toLocaleString()}</p>
-              </div>
-              <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-                <p><strong className="text-slate-800 dark:text-slate-200">Address:</strong></p>
-                <p>{property.address.houseNumber}, {property.address.street}, {property.address.area}</p>
-                <p>{property.address.city}, {property.address.state} - {property.address.pincode}</p>
-              </div>
-              <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400">
-                <p><strong className="text-slate-800 dark:text-slate-200">Amenities:</strong></p>
-                <div className="flex flex-wrap gap-1.5">
-                  {property.amenities.map(a => (
-                    <span key={a} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      {a}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Ledger logs & complaints lists */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Bills list */}
-          <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Payment Ledger History</h4>
-              <Link to="/bills" className="text-xs text-brand-500 hover:underline">Ledger</Link>
-            </div>
-            <div className="space-y-2">
-              {paymentHistory.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-6">No payment logs available.</p>
-              ) : (
-                paymentHistory.map((pay, i) => (
-                  <div key={i} className="flex justify-between items-center text-xs p-2.5 rounded-xl bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200/50 dark:border-slate-800/50">
-                    <div>
-                      <p className="font-semibold text-slate-800 dark:text-slate-200">Invoice: {pay.bill?.invoiceNumber || 'Manual Receipt'}</p>
-                      <span className="text-[9px] text-slate-400 block font-mono">{new Date(pay.paymentDate).toLocaleString()}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold text-emerald-600 dark:text-emerald-400">INR {pay.amount?.toLocaleString()}</span>
-                      <span className="block text-[9px] text-slate-400 uppercase font-semibold">{pay.paymentMethod}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Maintenance list */}
-          <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Recent Complaints & Repairs</h4>
-              <Link to="/maintenance" className="text-xs text-brand-500 hover:underline">New Ticket</Link>
-            </div>
-            <div className="space-y-2">
-              {complaintsList.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-6">No support tickets raised.</p>
-              ) : (
-                complaintsList.map((comp, i) => {
-                  let badgeColor = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
-                  if (comp.status === 'resolved') badgeColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-                  if (comp.status === 'rejected') badgeColor = 'bg-red-500/10 text-red-500 border-red-500/20';
-
-                  return (
-                    <div key={i} className="flex justify-between items-center text-xs p-2.5 rounded-xl bg-slate-50/50 dark:bg-slate-900/10 border border-slate-200/50 dark:border-slate-800/50">
-                      <div>
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">{comp.category}</p>
-                        <p className="text-[10px] text-slate-400 truncate max-w-xs">{comp.description}</p>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wider ${badgeColor}`}>
-                        {comp.status}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
             </div>
           </div>
         </div>
       </div>
     );
   }
+
+  // =========================================================================
+  // 2. RESIDENT TENANT DASHBOARD
+  // =========================================================================
+  const tenant = data?.tenantDetails || {};
+  const property = data?.property || null;
+  const pendingBill = data?.pendingBill || null;
+  const daysRemaining = data?.daysRemaining || 0;
+  const paymentHistory = data?.paymentHistory || [];
+  const complaintsList = data?.complaintsList || [];
+
+  return (
+    <div className="space-y-6">
+      {/* Resident Welcome Banner */}
+      <div className="glass-panel-elevated p-6 sm:p-8 rounded-[2rem] border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] relative overflow-hidden shadow-sm">
+        <div className="absolute right-0 top-0 w-96 h-96 bg-[#D97706]/10 dark:bg-[#4A1715]/30 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold mb-3 border border-emerald-500/20">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Verified Resident Portal</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-[#39251F] dark:text-[#F6EEE3] Outfit tracking-tight">
+              Welcome home, {tenant.name || user?.name}! 🏠
+            </h1>
+            <p className="text-xs sm:text-sm text-[#77665A] dark:text-[#D1C1B0] mt-1 max-w-xl">
+              {property ? (
+                <span>
+                  Resident at <strong className="text-[#39251F] dark:text-[#F6EEE3]">{property.name}</strong> •{' '}
+                  {property.address?.city || 'Bengaluru'}
+                </span>
+              ) : (
+                'Manage your rental billing, payment history, and maintenance requests in one place.'
+              )}
+            </p>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            {pendingBill ? (
+              <Link
+                to="/bills"
+                className="inline-flex items-center gap-2 px-4 py-2.5 btn-primary-glow text-[#FAF7F1] text-xs font-bold rounded-full shadow-md transition-all cursor-pointer"
+              >
+                <CreditCard className="w-4 h-4" />
+                <span>Pay Rent Bill</span>
+              </Link>
+            ) : (
+              <Link
+                to="/bills"
+                className="inline-flex items-center gap-2 px-4 py-2.5 glass-panel text-[#39251F] dark:text-[#F6EEE3] text-xs font-bold rounded-full border border-[#D9CABB]/80 dark:border-[rgba(230,211,191,0.15)] hover:bg-[#E6DACC]/60 transition-all cursor-pointer shadow-xs"
+              >
+                <FileText className="w-4 h-4" />
+                <span>View Receipts</span>
+              </Link>
+            )}
+
+            <Link
+              to="/maintenance"
+              className="inline-flex items-center gap-2 px-4 py-2.5 glass-panel text-[#39251F] dark:text-[#F6EEE3] hover:text-[#4A1917] text-xs font-bold rounded-full border border-[#D9CABB]/80 dark:border-[rgba(230,211,191,0.15)] transition-all hover:bg-[#E6DACC]/60 cursor-pointer shadow-xs"
+            >
+              <Wrench className="w-4 h-4" />
+              <span>Request Service</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Top 3 High-Impact Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Card 1: Rent Payment Status */}
+        <div className="glass-panel-elevated p-6 rounded-3xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between shadow-sm">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Monthly Rent Status
+              </span>
+              <div className="p-2.5 rounded-xl bg-[#E6DACC] dark:bg-[#352920] text-brand-600 dark:text-brand-300">
+                <CreditCard className="w-5 h-5" />
+              </div>
+            </div>
+
+            {pendingBill ? (
+              <div className="space-y-2 mt-2">
+                <div className="text-3xl font-black text-rose-700 dark:text-rose-400 Outfit">
+                  ₹{Number(pendingBill.totalAmount || 0).toLocaleString()}
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-[#77665A] dark:text-[#D1C1B0]">
+                  <Clock className="w-4 h-4 text-amber-500" />
+                  <span>
+                    Due by: <strong className="text-[#39251F] dark:text-[#F6EEE3]">{new Date(pendingBill.dueDate).toLocaleDateString()}</strong>
+                  </span>
+                </div>
+                {pendingBill.status === 'overdue' && (
+                  <span className="inline-block text-[10px] font-bold px-2.5 py-0.5 bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 rounded-full uppercase tracking-wider">
+                    Late Fee Charged
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="py-4 text-emerald-700 dark:text-emerald-400 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-700 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-base text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                      Dues Cleared!
+                    </h4>
+                    <span className="text-xs text-[#77665A] dark:text-[#D1C1B0]">
+                      Zero outstanding balance
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {pendingBill ? (
+            <Link
+              to="/bills"
+              className="mt-6 w-full py-3 btn-primary-glow text-[#FAF7F1] rounded-full text-center text-xs font-bold shadow-md transition-all block"
+            >
+              Pay Online Now
+            </Link>
+          ) : (
+            <Link
+              to="/bills"
+              className="mt-6 w-full py-2.5 border border-[#D9CABB] dark:border-[rgba(230,211,191,0.15)] hover:bg-[#E6DACC]/60 text-[#39251F] dark:text-[#F6EEE3] rounded-full text-center text-xs font-bold transition-all block"
+            >
+              Download Previous Receipts
+            </Link>
+          )}
+        </div>
+
+        {/* Card 2: Lease Duration Remaining */}
+        <div className="glass-panel-elevated p-6 rounded-3xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between shadow-sm">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Lease Agreement
+              </span>
+              <div className="p-2.5 rounded-xl bg-[#E6DACC] dark:bg-[#352920] text-[#4A1917] dark:text-[#D1C1B0]">
+                <CalendarDays className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="space-y-2 mt-2">
+              <div className="text-3xl font-black text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                {daysRemaining} Days Left
+              </div>
+              <p className="text-xs text-[#77665A] dark:text-[#D1C1B0]">
+                Agreement valid until:{' '}
+                <strong className="text-[#39251F] dark:text-[#F6EEE3]">
+                  {tenant.leaseEndDate ? new Date(tenant.leaseEndDate).toLocaleDateString() : 'Active Term'}
+                </strong>
+              </p>
+
+              {/* Progress bar */}
+              <div className="w-full bg-[#E6DACC] dark:bg-[#352920] h-2.5 rounded-full mt-3 overflow-hidden">
+                <div
+                  className="bg-brand-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, Math.round((daysRemaining / 365) * 100))}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {tenant.leaseAgreementUrl ? (
+            <a
+              href={tenant.leaseAgreementUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-6 w-full py-2.5 border border-[#D9CABB] dark:border-[rgba(230,211,191,0.15)] text-brand-600 dark:text-brand-400 hover:bg-[#E6DACC]/60 rounded-full text-center text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+            >
+              <span>View Signed Agreement</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : (
+            <div className="mt-6 py-2 text-center text-[11px] text-[#77665A] font-medium">
+              Standard Digital Tenancy Active
+            </div>
+          )}
+        </div>
+
+        {/* Card 3: Landlord & Property Support */}
+        <div className="glass-panel-elevated p-6 rounded-3xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] flex flex-col justify-between shadow-sm">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-bold text-[#77665A] dark:text-[#D1C1B0] uppercase tracking-wider">
+                Primary Contact
+              </span>
+              <div className="p-2.5 rounded-xl bg-[#E6DACC] dark:bg-[#352920] text-brand-600 dark:text-brand-300">
+                <Building className="w-5 h-5" />
+              </div>
+            </div>
+
+            {property?.owner ? (
+              <div className="flex items-center gap-3.5 mt-2">
+                <img
+                  src={property.owner.profilePhoto || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=100'}
+                  alt="Owner"
+                  className="w-12 h-12 rounded-2xl object-cover border-2 border-brand-500/30 shadow-sm"
+                />
+                <div>
+                  <h4 className="font-extrabold text-sm text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                    {property.owner.name}
+                  </h4>
+                  <span className="inline-block text-[10px] font-bold text-brand-600 dark:text-brand-400 bg-[#E6DACC] dark:bg-[#352920] px-2 py-0.5 rounded-full mt-0.5">
+                    Property Owner / Landlord
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-[#77665A] mt-2">Designated management team assigned.</p>
+            )}
+          </div>
+
+          {property?.owner && (
+            <div className="grid grid-cols-2 gap-2 mt-6">
+              <a
+                href={`tel:${property.owner.contactNumber}`}
+                className="py-2.5 bg-[#E6DACC]/60 dark:bg-[#352920] text-[#39251F] dark:text-[#F6EEE3] rounded-xl text-center text-xs font-bold hover:bg-[#E6DACC] transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Phone className="w-3.5 h-3.5 text-brand-600" />
+                <span>Call</span>
+              </a>
+              <a
+                href={`mailto:${property.owner.email}`}
+                className="py-2.5 bg-[#E6DACC]/60 dark:bg-[#352920] text-[#39251F] dark:text-[#F6EEE3] rounded-xl text-center text-xs font-bold hover:bg-[#E6DACC] transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Mail className="w-3.5 h-3.5 text-brand-600" />
+                <span>Email</span>
+              </a>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Property Details Snapshot */}
+      {property && (
+        <div className="glass-panel-elevated p-6 sm:p-8 rounded-[2rem] border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)] shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h4 className="font-extrabold text-base text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                Rental Apartment Details
+              </h4>
+              <p className="text-xs text-[#77665A] dark:text-[#D1C1B0]">
+                Specifications, coordinates, and included amenities
+              </p>
+            </div>
+            <span className="text-xs font-bold px-3 py-1 rounded-full bg-[#E6DACC] text-[#4A1917] dark:bg-[#352920] dark:text-[#D1C1B0] border border-[#D9CABB] dark:border-[rgba(230,211,191,0.15)] uppercase tracking-wider">
+              {property.type || 'Apartment'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+            <div className="space-y-2 text-xs text-[#77665A] dark:text-[#D1C1B0] p-4 rounded-2xl bg-[#E6DACC]/30 dark:bg-[#352920]/30 border border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.1)]">
+              <span className="text-[10px] font-black uppercase text-[#77665A] tracking-wider block mb-2">Financials</span>
+              <p className="flex justify-between">
+                <span>Monthly Rent:</span>{' '}
+                <strong className="text-[#39251F] dark:text-[#F6EEE3] font-black">₹{Number(property.monthlyRent || 0).toLocaleString()}</strong>
+              </p>
+              <p className="flex justify-between">
+                <span>Security Deposit:</span>{' '}
+                <strong className="text-[#39251F] dark:text-[#F6EEE3] font-black">₹{Number(property.securityDeposit || 0).toLocaleString()}</strong>
+              </p>
+              <p className="flex justify-between">
+                <span>Billing Cycle:</span>{' '}
+                <strong className="text-brand-600 dark:text-brand-400 font-bold">1st of Month</strong>
+              </p>
+            </div>
+
+            <div className="space-y-1.5 text-xs text-[#77665A] dark:text-[#D1C1B0] p-4 rounded-2xl bg-[#E6DACC]/30 dark:bg-[#352920]/30 border border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.1)]">
+              <span className="text-[10px] font-black uppercase text-[#77665A] tracking-wider block mb-2">Location</span>
+              <p className="font-bold text-[#39251F] dark:text-[#F6EEE3]">
+                {property.address?.houseNumber}, {property.address?.street}
+              </p>
+              <p>{property.address?.area}</p>
+              <p className="text-[#77665A]">{property.address?.city}, {property.address?.state} - {property.address?.pincode}</p>
+            </div>
+
+            <div className="space-y-2 text-xs text-[#77665A] dark:text-[#D1C1B0] p-4 rounded-2xl bg-[#E6DACC]/30 dark:bg-[#352920]/30 border border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.1)]">
+              <span className="text-[10px] font-black uppercase text-[#77665A] tracking-wider block mb-2">Amenities Included</span>
+              <div className="flex flex-wrap gap-1.5">
+                {(property.amenities || []).map((amenity, idx) => (
+                  <span
+                    key={idx}
+                    className="text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-[rgba(251,247,240,0.85)] dark:bg-[rgba(53,41,32,0.85)] text-[#39251F] dark:text-[#F6EEE3] border border-[#D9CABB] dark:border-[rgba(230,211,191,0.15)]"
+                  >
+                    {amenity}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ledger & Maintenance Feeds */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Payment History */}
+        <div className="glass-panel-elevated p-6 rounded-3xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)]">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h4 className="font-extrabold text-base text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                Payment History
+              </h4>
+              <p className="text-xs text-[#77665A] dark:text-[#D1C1B0]">Past transactions and receipts</p>
+            </div>
+            <Link to="/bills" className="text-xs text-brand-600 dark:text-brand-400 font-bold hover:underline">
+              All Bills
+            </Link>
+          </div>
+
+          <div className="space-y-2.5">
+            {paymentHistory.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#77665A]">
+                <CreditCard className="w-6 h-6 mx-auto mb-1.5 opacity-30" />
+                No payment transactions recorded yet.
+              </div>
+            ) : (
+              paymentHistory.slice(0, 5).map((pay, i) => (
+                <div
+                  key={i}
+                  className="flex justify-between items-center text-xs p-3 rounded-2xl bg-[#E6DACC]/40 dark:bg-[#352920]/40 border border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.1)]"
+                >
+                  <div>
+                    <p className="font-bold text-[#39251F] dark:text-[#F6EEE3]">
+                      Invoice: {pay.bill?.invoiceNumber || `REC-${1000 + i}`}
+                    </p>
+                    <span className="text-[10px] text-[#77665A] block font-medium mt-0.5">
+                      {new Date(pay.paymentDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-black text-emerald-700 dark:text-emerald-400 block text-xs">
+                      ₹{Number(pay.amount || 0).toLocaleString()}
+                    </span>
+                    <span className="text-[9px] px-2 py-0.5 rounded bg-[rgba(251,247,240,0.85)] dark:bg-[rgba(53,41,32,0.85)] text-[#77665A] border border-[#D9CABB]/60 uppercase font-bold">
+                      {pay.paymentMethod || 'Online'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Complaints & Repair Requests */}
+        <div className="glass-panel-elevated p-6 rounded-3xl border border-[#D9CABB]/70 dark:border-[rgba(230,211,191,0.12)]">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h4 className="font-extrabold text-base text-[#39251F] dark:text-[#F6EEE3] Outfit">
+                Service Tickets
+              </h4>
+              <p className="text-xs text-[#77665A] dark:text-[#D1C1B0]">Recent maintenance requests</p>
+            </div>
+            <Link to="/maintenance" className="text-xs text-brand-600 dark:text-brand-400 font-bold hover:underline">
+              + New Request
+            </Link>
+          </div>
+
+          <div className="space-y-2.5">
+            {complaintsList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[#77665A]">
+                <Wrench className="w-6 h-6 mx-auto mb-1.5 opacity-30" />
+                No active service tickets. Everything is running smoothly!
+              </div>
+            ) : (
+              complaintsList.slice(0, 5).map((comp, i) => {
+                let badgeColor = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
+                if (comp.status === 'resolved') badgeColor = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
+                if (comp.status === 'rejected') badgeColor = 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20';
+
+                return (
+                  <div
+                    key={i}
+                    className="flex justify-between items-center text-xs p-3 rounded-2xl bg-[#E6DACC]/40 dark:bg-[#352920]/40 border border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.1)]"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <p className="font-bold text-[#39251F] dark:text-[#F6EEE3] truncate">
+                        {comp.category || 'General Repair'}
+                      </p>
+                      <p className="text-[11px] text-[#77665A] dark:text-[#D1C1B0] truncate max-w-xs mt-0.5">
+                        {comp.description}
+                      </p>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-wider shrink-0 ${badgeColor}`}>
+                      {comp.status}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default Dashboard;

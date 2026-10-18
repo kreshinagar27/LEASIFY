@@ -99,17 +99,17 @@ const CalendarView = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-black text-slate-800 dark:text-white Outfit">Rental Calendar</h1>
-        <p className="text-xs text-slate-500">Monitor scheduled maintenance visits, lease expiry deadlines and invoice collections.</p>
+        <h1 className="text-2xl font-black text-espresso dark:text-cream-50 Outfit">Rental Calendar</h1>
+        <p className="text-xs text-cream-600 dark:text-cream-400">Monitor scheduled maintenance visits, lease expiry deadlines and invoice collections.</p>
       </div>
 
       <CalendarWidget events={events} />
 
-      <div className="glass-panel p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-3">
+      <div className="glass-panel p-4 rounded-2xl border border-cream-300 dark:border-espresso-800 flex items-center gap-3">
         <Info className="w-5 h-5 text-brand-500 flex-shrink-0" />
-        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+        <p className="text-xs text-cream-600 dark:text-cream-400 leading-relaxed">
           The calendar consolidates lease termination dates, pending billing invoices, and active maintenance tickets.
           Hover/check dates marked with color circles to see detailed work orders.
         </p>

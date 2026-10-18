@@ -5,10 +5,14 @@ import MapComponent from '../components/MapComponent';
 import {
   Building, MapPin, Grid, ShieldAlert,
   Calendar, Wrench, CheckCircle, ChevronLeft,
-  ChevronRight, Sparkles, UserPlus, Info, Check, Eye, Edit, Zap, Droplets, Compass, Layers, Phone, Mail
+  ChevronRight, Sparkles, UserPlus, Info, Check, Eye, EyeOff, Edit, Zap, Droplets, Compass, Layers, Phone, Mail, UserCheck, X, Key
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useForm } from 'react-hook-form';
+import { useAuth } from '../context/AuthContext';
+import PropertyGallery from '../components/PropertyGallery';
+import InternationalPhoneInput from '../components/InternationalPhoneInput';
+import { getMediaUrl } from '../utils/mediaHelper';
 
 const AVAILABLE_AMENITIES = [
   'Lift / Elevator',
@@ -28,13 +32,21 @@ const AVAILABLE_AMENITIES = [
 const PropertyDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const [property, setProperty] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [activeEditTab, setActiveEditTab] = useState('basic');
   const [selectedAmenities, setSelectedAmenities] = useState([]);
+
+  // Edit Tenant State for Owner
+  const [editTenantModalOpen, setEditTenantModalOpen] = useState(false);
+  const [editTenantData, setEditTenantData] = useState({});
+  const [tenantPhoneMeta, setTenantPhoneMeta] = useState(null);
+  const [tenantPhoneError, setTenantPhoneError] = useState('');
+  const [tenantSaving, setTenantSaving] = useState(false);
+  const [showTenantPassword, setShowTenantPassword] = useState(false);
 
   const { register, handleSubmit, reset, setValue } = useForm();
 
@@ -105,8 +117,8 @@ const PropertyDetail = () => {
       const res = await apiClient.put(`/properties/${property._id}`, payload);
       if (res.data.success) {
         toast.success('Property updated successfully!');
-        setProperty(res.data.data);
         setEditModalOpen(false);
+        fetchProperty();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update property');
@@ -117,11 +129,63 @@ const PropertyDetail = () => {
     try {
       const { data } = await apiClient.put(`/properties/${property._id}`, { status });
       if (data.success) {
-        setProperty(prev => ({ ...prev, status: data.data.status }));
         toast.success(`Property marked: ${status}`);
+        fetchProperty();
       }
     } catch (err) {
       toast.error('Failed to update status');
+    }
+  };
+
+  const openEditTenantModal = () => {
+    if (!property?.tenant) return;
+    const t = property.tenant;
+    setEditTenantData({
+      name: t.name || '',
+      email: t.email || '',
+      phone: t.phone || '',
+      gender: t.gender || 'Unspecified',
+      occupation: t.occupation || '',
+      unitNumber: t.unitNumber || '',
+      aadhaarNumber: t.aadhaarNumber || '',
+      panNumber: t.panNumber || '',
+      monthlyRent: t.monthlyRent !== undefined ? t.monthlyRent : (property.monthlyRent || ''),
+      securityDeposit: t.securityDeposit !== undefined ? t.securityDeposit : (property.securityDeposit || ''),
+      leaseStartDate: t.leaseStartDate ? new Date(t.leaseStartDate).toISOString().split('T')[0] : '',
+      leaseEndDate: t.leaseEndDate ? new Date(t.leaseEndDate).toISOString().split('T')[0] : '',
+      emergencyName: t.emergencyContact?.name || '',
+      emergencyPhone: t.emergencyContact?.phone || '',
+      emergencyRelation: t.emergencyContact?.relationship || '',
+      password: ''
+    });
+    setShowTenantPassword(false);
+    setTenantPhoneError('');
+    setEditTenantModalOpen(true);
+  };
+
+  const handleTenantEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!property?.tenant?._id) return;
+    if (tenantPhoneMeta && !tenantPhoneMeta.isValid) {
+      setTenantPhoneError('Please enter a valid international phone number.');
+      return;
+    }
+    if (editTenantData.password && editTenantData.password.trim().length > 0 && editTenantData.password.trim().length < 6) {
+      toast.error('New password must be at least 6 characters long.');
+      return;
+    }
+    setTenantSaving(true);
+    try {
+      const res = await apiClient.put(`/tenants/${property.tenant._id}`, editTenantData);
+      if (res.data.success) {
+        toast.success('Tenant profile updated successfully!');
+        setEditTenantModalOpen(false);
+        fetchProperty();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update tenant profile');
+    } finally {
+      setTenantSaving(false);
     }
   };
 
@@ -145,14 +209,10 @@ const PropertyDetail = () => {
     );
   }
 
-  const images = property.images && property.images.length > 0
-    ? property.images
-    : [{ url: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800' }];
-
-  let statusColor = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
-  if (property.status === 'Vacant') statusColor = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
-  if (property.status === 'Under Maintenance') statusColor = 'bg-red-500/10 text-red-500 border-red-500/20';
-  if (property.status === 'Reserved') statusColor = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+  let statusColor = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20';
+  if (property.status === 'Vacant') statusColor = 'bg-[#E6DACC] text-[#4A1917] dark:bg-[#352920] dark:text-[#F6EEE3] border border-[#D9CABB] dark:border-[rgba(230,211,191,0.2)]';
+  if (property.status === 'Under Maintenance') statusColor = 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20';
+  if (property.status === 'Reserved') statusColor = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
 
   return (
     <div className="space-y-6">
@@ -161,51 +221,28 @@ const PropertyDetail = () => {
         <Link to="/properties" className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
           <ChevronLeft className="w-3.5 h-3.5" /> Back to Properties
         </Link>
-        <button
-          onClick={openEditModal}
-          className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/25 flex items-center gap-1.5 transition-all"
-        >
-          <Edit className="w-3.5 h-3.5" /> Edit Property Details
-        </button>
+        {user?.role === 'owner' && (
+          <button
+            onClick={openEditModal}
+            className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-500/25 flex items-center gap-1.5 transition-all"
+          >
+            <Edit className="w-3.5 h-3.5" /> Edit Property Details
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT COLUMN: Gallery & Specifications */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Gallery Carousel */}
-          <div className="relative h-80 w-full rounded-2xl overflow-hidden glass-panel border border-slate-200 dark:border-slate-800 shadow-lg">
-            <img
-              src={images[activeImageIdx]?.url}
-              alt=""
-              className="w-full h-full object-cover transition-all duration-300"
-            />
-
-            {images.length > 1 && (
-              <>
-                <button
-                  onClick={() => setActiveImageIdx(p => (p === 0 ? images.length - 1 : p - 1))}
-                  className="absolute left-4 top-1/2 transform -translate-y-1/2 p-2 bg-slate-900/40 backdrop-blur text-white rounded-full hover:bg-slate-900/60"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setActiveImageIdx(p => (p === images.length - 1 ? 0 : p + 1))}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 p-2 bg-slate-900/40 backdrop-blur text-white rounded-full hover:bg-slate-900/60"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-                <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
-                  {images.map((_, i) => (
-                    <div
-                      key={i}
-                      onClick={() => setActiveImageIdx(i)}
-                      className={`w-1.5 h-1.5 rounded-full cursor-pointer transition-all ${activeImageIdx === i ? 'bg-white w-4' : 'bg-white/40'}`}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          {/* Photos & Videos Gallery */}
+          <PropertyGallery
+            propertyId={property._id}
+            media={property.media || []}
+            coverPhoto={property.coverPhoto || (property.images?.[0]?.url || '')}
+            propertyName={property.name}
+            isOwner={user?.role === 'owner'}
+            onMediaUpdated={fetchProperty}
+          />
 
           {/* MAIN SPECIFICATIONS & PRICING BREAKDOWN */}
           <div className="glass-panel p-6 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-5">
@@ -347,40 +384,65 @@ const PropertyDetail = () => {
 
           {/* ACTIVE TENANCY CARD */}
           <div className="glass-panel p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
-            <h4 className="font-bold text-sm text-slate-800 dark:text-white mb-3">Active Tenancy</h4>
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="font-bold text-sm text-slate-800 dark:text-white">Active Tenancy</h4>
+              {property.tenant && (
+                <span className={`px-2 py-0.5 border text-[10px] font-bold uppercase tracking-wider rounded-full ${property.tenant.isActive !== false ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
+                  {property.tenant.isActive !== false ? 'Active' : 'Deactivated'}
+                </span>
+              )}
+            </div>
             {property.tenant ? (
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <img
-                    src={property.tenant.profilePhoto || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
+                    src={getMediaUrl(property.tenant.profilePhoto)}
+                    onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'; }}
                     alt=""
-                    className="w-10 h-10 rounded-full object-cover"
+                    className="w-12 h-12 rounded-full object-cover border border-slate-200 dark:border-slate-800 flex-shrink-0"
                   />
-                  <div>
-                    <h5 className="font-bold text-sm text-slate-800 dark:text-slate-200">{property.tenant.name}</h5>
-                    <span className="text-[10px] text-slate-400 font-mono">{property.tenant.email}</span>
+                  <div className="min-w-0">
+                    <h5 className="font-bold text-sm text-slate-800 dark:text-slate-200 truncate">{property.tenant.name}</h5>
+                    <p className="text-[11px] text-slate-400 truncate">{property.tenant.occupation || 'Resident Tenant'} • {property.tenant.gender || 'Unspecified'}</p>
+                    <span className="text-[10px] text-slate-400 font-mono block truncate">{property.tenant.email}</span>
                   </div>
                 </div>
 
                 <div className="text-xs space-y-1.5 pt-2 border-t border-slate-200/50 dark:border-slate-800/50 text-slate-600 dark:text-slate-400">
                   <p><strong>Phone:</strong> {property.tenant.phone}</p>
-                  <p><strong>Lease Start:</strong> {new Date(property.tenant.leaseStartDate).toLocaleDateString()}</p>
-                  <p><strong>Lease End:</strong> {new Date(property.tenant.leaseEndDate).toLocaleDateString()}</p>
+                  {property.tenant.unitNumber && <p><strong>Unit / Flat:</strong> {property.tenant.unitNumber}</p>}
+                  {property.tenant.aadhaarNumber && <p><strong>Aadhaar:</strong> {property.tenant.aadhaarNumber}</p>}
+                  {property.tenant.panNumber && <p><strong>PAN:</strong> {property.tenant.panNumber}</p>}
+                  {property.tenant.emergencyContact?.name && (
+                    <p><strong>Emergency:</strong> {property.tenant.emergencyContact.name} ({property.tenant.emergencyContact.phone || 'N/A'})</p>
+                  )}
+                  <p><strong>Lease Start:</strong> {property.tenant.leaseStartDate ? new Date(property.tenant.leaseStartDate).toLocaleDateString() : 'N/A'}</p>
+                  <p><strong>Lease End:</strong> {property.tenant.leaseEndDate ? new Date(property.tenant.leaseEndDate).toLocaleDateString() : 'N/A'}</p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 mt-4 pt-2">
-                  <Link
-                    to={`/tenants/${property.tenant._id}`}
-                    className="py-1.5 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 rounded-lg text-center text-xs font-bold transition-all flex items-center justify-center gap-1"
-                  >
-                    <Eye className="w-3.5 h-3.5" /> Tenant File
-                  </Link>
-                  <button
-                    onClick={() => navigate(`/tenants/${property.tenant._id}?triggerMoveOut=true`)}
-                    className="py-1.5 bg-red-500/10 text-red-500 border border-red-500/10 hover:bg-red-500/25 rounded-lg text-xs font-bold transition-all"
-                  >
-                    Move-Out Unit
-                  </button>
+                <div className="flex flex-col gap-2 mt-4 pt-2 border-t border-slate-200/50 dark:border-slate-800/50">
+                  {user?.role === 'owner' && (
+                    <button
+                      onClick={openEditTenantModal}
+                      className="w-full py-1.5 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-center text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-md shadow-brand-500/20"
+                    >
+                      <Edit className="w-3.5 h-3.5" /> Edit Profile & Password
+                    </button>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Link
+                      to={`/tenants/${property.tenant._id}`}
+                      className="py-1.5 bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-200 rounded-lg text-center text-xs font-bold transition-all flex items-center justify-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Tenant File
+                    </Link>
+                    <button
+                      onClick={() => navigate(`/tenants/${property.tenant._id}?triggerMoveOut=true`)}
+                      className="py-1.5 bg-red-500/10 text-red-500 border border-red-500/10 hover:bg-red-500/25 rounded-lg text-xs font-bold transition-all"
+                    >
+                      Move-Out Unit
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -405,7 +467,7 @@ const PropertyDetail = () => {
               <button
                 disabled={!!property.tenant}
                 onClick={() => updateStatus('Vacant')}
-                className={`py-1.5 rounded-lg text-xs font-bold border transition-all ${property.status === 'Vacant' ? 'bg-blue-500 text-white border-blue-500' : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:bg-slate-100'} disabled:opacity-40`}
+                className={`py-1.5 rounded-lg text-xs font-bold border transition-all ${property.status === 'Vacant' ? 'bg-[#4A1917] text-white border-[#4A1917] dark:bg-[#754039] dark:border-[#754039]' : 'bg-[#E6DACC]/50 dark:bg-[#352920]/50 text-[#77665A] dark:text-[#D1C1B0] border-[#D9CABB] dark:border-[rgba(230,211,191,0.15)] hover:bg-[#E6DACC]'} disabled:opacity-40 cursor-pointer`}
               >
                 Mark Vacant
               </button>
@@ -661,6 +723,215 @@ const PropertyDetail = () => {
                   className="px-5 py-2 text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-xl shadow-lg transition-all"
                 >
                   Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT TENANT PROFILE MODAL */}
+      {editTenantModalOpen && property?.tenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
+          <div className="w-full max-w-lg glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col relative max-h-[92vh] overflow-y-auto shadow-2xl">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+              <div>
+                <h3 className="font-extrabold text-lg text-slate-800 dark:text-slate-100 Outfit">Edit Tenant Profile</h3>
+                <p className="text-xs text-slate-500">Update resident details for unit {property.name}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditTenantModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 text-xl font-bold p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleTenantEditSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={editTenantData.name}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, name: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl glass-input"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    value={editTenantData.email}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, email: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl glass-input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Phone Number</label>
+                  <InternationalPhoneInput
+                    value={editTenantData.phone}
+                    onChange={(val, meta) => {
+                      setEditTenantData({ ...editTenantData, phone: val });
+                      setTenantPhoneMeta(meta);
+                      if (tenantPhoneError) setTenantPhoneError('');
+                    }}
+                    error={tenantPhoneError}
+                  />
+                  {tenantPhoneError && <span className="text-[10px] text-red-500 mt-1 block">{tenantPhoneError}</span>}
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Gender</label>
+                  <select
+                    value={editTenantData.gender}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, gender: e.target.value })}
+                    className="w-full px-2 py-2 rounded-xl glass-input"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                    <option value="Unspecified">Unspecified</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Occupation</label>
+                  <input
+                    type="text"
+                    value={editTenantData.occupation}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, occupation: e.target.value })}
+                    placeholder="e.g. Software Engineer"
+                    className="w-full px-3 py-2 rounded-xl glass-input"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Unit / Flat Number</label>
+                  <input
+                    type="text"
+                    value={editTenantData.unitNumber}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, unitNumber: e.target.value })}
+                    placeholder="e.g. Apt 301"
+                    className="w-full px-3 py-2 rounded-xl glass-input"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Monthly Rent (₹)</label>
+                  <input
+                    type="number"
+                    value={editTenantData.monthlyRent}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, monthlyRent: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl glass-input"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Security Deposit (₹)</label>
+                  <input
+                    type="number"
+                    value={editTenantData.securityDeposit}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, securityDeposit: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl glass-input"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Lease Start Date</label>
+                  <input
+                    type="date"
+                    value={editTenantData.leaseStartDate}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, leaseStartDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl glass-input"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-600 dark:text-slate-400 block mb-1">Lease End Date</label>
+                  <input
+                    type="date"
+                    value={editTenantData.leaseEndDate}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, leaseEndDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl glass-input"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-500/10 dark:bg-amber-950/20 border border-amber-500/25 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-xs text-[#38251F] dark:text-[#FAF7F1] flex items-center gap-1.5 Outfit">
+                    <Key className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> Set New Tenant Password ({editTenantData.name})
+                  </label>
+                  <span className="text-[10px] text-[#78685D] dark:text-[#A8988A]">(Tenant login only • Owner login unaffected)</span>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showTenantPassword ? "text" : "password"}
+                    value={editTenantData.password || ''}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, password: e.target.value })}
+                    placeholder="Enter new password (min. 6 characters)"
+                    className="w-full px-3 py-2 pr-10 rounded-xl glass-input text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTenantPassword(!showTenantPassword)}
+                    className="absolute right-3 top-2.5 text-[#78685D] hover:text-[#38251F] dark:text-[#A8988A] dark:hover:text-[#FAF7F1]"
+                  >
+                    {showTenantPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 space-y-2">
+                <span className="font-bold text-[11px] text-slate-500 uppercase tracking-wider block">Emergency Contact</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Name"
+                    value={editTenantData.emergencyName}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, emergencyName: e.target.value })}
+                    className="px-2.5 py-1.5 rounded-xl glass-input"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Phone"
+                    value={editTenantData.emergencyPhone}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, emergencyPhone: e.target.value })}
+                    className="px-2.5 py-1.5 rounded-xl glass-input"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Relationship"
+                    value={editTenantData.emergencyRelation}
+                    onChange={(e) => setEditTenantData({ ...editTenantData, emergencyRelation: e.target.value })}
+                    className="px-2.5 py-1.5 rounded-xl glass-input"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditTenantModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={tenantSaving}
+                  className="px-5 py-2 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-xl shadow-lg transition-all disabled:opacity-50"
+                >
+                  {tenantSaving ? 'Saving...' : 'Save Tenant Profile'}
                 </button>
               </div>
             </form>

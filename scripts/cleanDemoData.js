@@ -6,12 +6,14 @@ const connectDB = require('../backend/config/db');
 const Owner = require('../backend/models/Owner');
 const Tenant = require('../backend/models/Tenant');
 const Property = require('../backend/models/Property');
+const Apartment = require('../backend/models/Apartment');
 const Bill = require('../backend/models/Bill');
 const Payment = require('../backend/models/Payment');
 const Maintenance = require('../backend/models/Maintenance');
 const Notification = require('../backend/models/Notification');
+const AuditLog = require('../backend/models/AuditLog');
 
-const PRESERVE_OWNER_EMAIL = process.env.PRESERVE_OWNER_EMAIL || 'kreshinagar27@gmail.com';
+const PRESERVE_OWNER_EMAIL = (process.env.PRESERVE_OWNER_EMAIL || process.env.OWNER_EMAIL || 'dakshvashistha1369@gmail.com').trim().toLowerCase();
 
 const clean = async () => {
   try {
@@ -30,6 +32,9 @@ const clean = async () => {
     // Delete all properties
     const propResult = await Property.deleteMany({});
     console.log(`Deleted ${propResult.deletedCount} property(ies).`);
+    // Delete all apartments
+    const aptResult = await Apartment.deleteMany({});
+    console.log(`Deleted ${aptResult.deletedCount} apartment(s).`);
     // Delete other collections if they exist
     const billResult = await Bill.deleteMany({});
     console.log(`Deleted ${billResult.deletedCount} bill(s).`);
@@ -39,6 +44,8 @@ const clean = async () => {
     console.log(`Deleted ${maintResult.deletedCount} maintenance record(s).`);
     const notifResult = await Notification.deleteMany({});
     console.log(`Deleted ${notifResult.deletedCount} notification(s).`);
+    const auditResult = await AuditLog.deleteMany({});
+    console.log(`Deleted ${auditResult.deletedCount} audit log(s).`);
     console.log('✅ Demo data cleanup complete.');
     process.exit(0);
   } catch (err) {

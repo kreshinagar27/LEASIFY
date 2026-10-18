@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Tenant = require('../models/Tenant');
 const Property = require('../models/Property');
+const Apartment = require('../models/Apartment');
+const Owner = require('../models/Owner');
 const Bill = require('../models/Bill');
 const Payment = require('../models/Payment');
 const Maintenance = require('../models/Maintenance');
@@ -9,6 +11,7 @@ const logActivity = require('../utils/activityLogger');
 const { sendTenantWelcomeEmail } = require('../utils/emailService');
 const { sendSMS } = require('../utils/smsService');
 const { uploadToStorage } = require('../utils/uploader');
+const { parsePhoneNumberFromString } = require('libphonenumber-js');
 
 // Helper to generate a random temporary password
 const generateTempPassword = () => {
@@ -22,10 +25,10 @@ exports.addTenant = async (req, res, next) => {
   try {
     const {
       name, email, phone, password, tempPassword: customTempPassword,
-      gender, unitNumber, occupation, aadhaarNumber, panNumber,
+      gender, dateOfBirth, address, unitNumber, occupation, aadhaarNumber, panNumber,
       emergencyName, emergencyPhone, emergencyRelation,
-      propertyAssigned, monthlyRent, securityDeposit,
-      leaseStartDate, leaseEndDate,
+      propertyAssigned, apartmentAssigned, monthlyRent, securityDeposit,
+      leaseStartDate, leaseEndDate, isActive,
       electricityReading, waterReading, depositCollected, keyHandoverConfirmed
     } = req.body;
 
@@ -33,28 +36,76 @@ exports.addTenant = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Name, email, and phone are required.' });
     }
 
-    // Check if email already exists
-    const emailExists = await Tenant.findOne({ email });
-    if (emailExists) {
-      return res.status(400).json({ success: false, message: 'Email already registered as a tenant' });
+    const emailRegex = /^\S+@\S+\.\S+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid email address.' });
+    }
+
+    // Check if email already registered as owner or tenant
+    const ownerExists = await Owner.findOne({ email });
+    const tenantExists = await Tenant.findOne({ email });
+    if (ownerExists || tenantExists) {
+      return res.status(400).json({ success: false, message: 'Email already registered in system.' });
+    }
+
+    // Validate & Normalize Phone Number
+    const rawPhone = (typeof phone === 'string' ? phone : '').trim();
+    let normalizedPhone = rawPhone;
+    try {
+      const parsed = parsePhoneNumberFromString(rawPhone);
+      if (parsed && parsed.isValid()) {
+        normalizedPhone = parsed.format('E.164');
+      } else {
+        const parsedWithDefault = parsePhoneNumberFromString(rawPhone, 'IN');
+        if (parsedWithDefault && parsedWithDefault.isValid()) {
+          normalizedPhone = parsedWithDefault.format('E.164');
+        } else {
+          return res.status(400).json({ success: false, message: 'Please enter a valid phone number.' });
+        }
+      }
+    } catch (e) {
+      return res.status(400).json({ success: false, message: 'Please enter a valid phone number.' });
+    }
+
+    // Check if phone already registered
+    const phoneInOwner = await Owner.findOne({ contactNumber: { $in: [normalizedPhone, rawPhone] } });
+    const phoneInTenant = await Tenant.findOne({ phone: { $in: [normalizedPhone, rawPhone] } });
+    if (phoneInOwner || phoneInTenant) {
+      return res.status(400).json({ success: false, message: 'Phone number already registered in system.' });
     }
 
     // Determine password
     const finalPassword = password || customTempPassword || generateTempPassword();
+    if (finalPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+    }
 
     let property = null;
-    if (propertyAssigned && mongoose.Types.ObjectId.isValid(propertyAssigned)) {
+    let apartment = null;
+
+    if (apartmentAssigned && mongoose.Types.ObjectId.isValid(apartmentAssigned)) {
+      apartment = await Apartment.findById(apartmentAssigned);
+      if (apartment) {
+        property = await Property.findById(apartment.property);
+      }
+    } else if (propertyAssigned && mongoose.Types.ObjectId.isValid(propertyAssigned)) {
       property = await Property.findById(propertyAssigned);
     }
+
+    const calcRent = parseFloat(monthlyRent) || (apartment ? apartment.monthlyRent : (property ? property.monthlyRent : 0));
+    const calcDeposit = parseFloat(securityDeposit) || (apartment ? apartment.securityDeposit : (property ? property.securityDeposit : 0));
+    const finalUnitNumber = unitNumber || (apartment ? apartment.number : '');
 
     // Create Tenant
     const tenant = await Tenant.create({
       name,
       email,
       password: finalPassword,
-      phone,
+      phone: normalizedPhone,
       gender: gender || 'Unspecified',
-      unitNumber: unitNumber || '',
+      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
+      address: address || '',
+      unitNumber: finalUnitNumber,
       occupation: occupation || '',
       aadhaarNumber: aadhaarNumber || ('Aadhaar-' + Math.floor(100000000000 + Math.random() * 900000000000)),
       panNumber: panNumber || '',
@@ -65,12 +116,14 @@ exports.addTenant = async (req, res, next) => {
       },
       owner: req.user.id,
       propertyAssigned: property ? property._id : null,
-      monthlyRent: parseFloat(monthlyRent) || (property ? property.monthlyRent : 0),
-      securityDeposit: parseFloat(securityDeposit) || (property ? property.securityDeposit : 0),
+      apartmentAssigned: apartment ? apartment._id : null,
+      monthlyRent: calcRent,
+      securityDeposit: calcDeposit,
       leaseStartDate: leaseStartDate ? new Date(leaseStartDate) : new Date(),
       leaseEndDate: leaseEndDate ? new Date(leaseEndDate) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       verified: true,
-      isActive: true,
+      isActive: isActive !== undefined ? (isActive === 'true' || isActive === true) : true,
+      role: 'tenant',
       moveInDetails: {
         meterReadings: {
           electricity: parseFloat(electricityReading) || 0,
@@ -81,6 +134,13 @@ exports.addTenant = async (req, res, next) => {
       }
     });
 
+    // Update Apartment Status if assigned
+    if (apartment) {
+      apartment.status = 'Occupied';
+      apartment.tenant = tenant._id;
+      await apartment.save();
+    }
+
     // Update Property Status if assigned
     if (property) {
       property.status = 'Occupied';
@@ -88,7 +148,7 @@ exports.addTenant = async (req, res, next) => {
       await property.save();
     }
 
-    // Send Welcome Email
+    // Send Welcome Email if SMTP available
     try {
       await sendTenantWelcomeEmail(tenant, finalPassword);
     } catch (err) {
@@ -105,13 +165,17 @@ exports.addTenant = async (req, res, next) => {
       req.user.id,
       'Owner',
       'Tenant Added',
-      `Tenant '${tenant.name}' was created and assigned to ${property ? property.name : 'No Property'}.`,
+      `Tenant '${tenant.name}' was created and assigned to ${property ? property.name : 'No Property'}${apartment ? ` (Unit ${apartment.number})` : ''}.`,
       req
     );
 
+    const populatedTenant = await Tenant.findById(tenant._id)
+      .populate('propertyAssigned', 'name address status')
+      .populate('apartmentAssigned', 'number floor areaSqFt status');
+
     res.status(201).json({
       success: true,
-      data: tenant,
+      data: populatedTenant,
       tempPassword: finalPassword
     });
   } catch (error) {
@@ -124,7 +188,11 @@ exports.addTenant = async (req, res, next) => {
 // @access  Private (Owner Only)
 exports.getTenants = async (req, res, next) => {
   try {
-    const tenants = await Tenant.find({ owner: req.user.id }).populate('propertyAssigned', 'name address status');
+    const tenants = await Tenant.find({ owner: req.user.id })
+      .populate('propertyAssigned', 'name address status monthlyRent')
+      .populate('apartmentAssigned', 'number floor areaSqFt status monthlyRent securityDeposit')
+      .sort({ createdAt: -1 });
+
     res.status(200).json({
       success: true,
       count: tenants.length,
@@ -144,10 +212,28 @@ exports.getTenant = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid Tenant ID' });
     }
 
-    const tenant = await Tenant.findById(req.params.id).populate('propertyAssigned', 'name address monthlyRent securityDeposit');
+    const tenant = await Tenant.findById(req.params.id)
+      .populate('propertyAssigned', 'name address monthlyRent securityDeposit status')
+      .populate('apartmentAssigned', 'number floor areaSqFt status monthlyRent securityDeposit');
 
     if (!tenant) {
       return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    // Authorization: Tenant can ONLY view their own account
+    if (req.userRole === 'tenant' && tenant._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden. You are not authorized to view other tenants.'
+      });
+    }
+
+    // Authorization: Owner can only view their own tenants
+    if (req.userRole === 'owner' && tenant.owner.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden. You are not authorized to view this tenant.'
+      });
     }
 
     res.status(200).json({
@@ -179,24 +265,65 @@ exports.updateTenant = async (req, res, next) => {
     }
 
     const {
-      name, email, phone, gender, unitNumber, occupation, panNumber, aadhaarNumber,
+      name, email, phone, gender, dateOfBirth, address, unitNumber, occupation, panNumber, aadhaarNumber,
       monthlyRent, securityDeposit, leaseStartDate, leaseEndDate,
-      emergencyName, emergencyPhone, emergencyRelation, propertyAssigned, isActive
+      emergencyName, emergencyPhone, emergencyRelation, propertyAssigned, apartmentAssigned, isActive,
+      password, newPassword
     } = req.body;
 
     if (name) tenant.name = name;
     if (email) tenant.email = email;
-    if (phone) tenant.phone = phone;
+    if (phone) {
+      const rawPhone = String(phone).trim();
+      let normalizedPhone = rawPhone;
+      try {
+        const parsed = parsePhoneNumberFromString(rawPhone);
+        if (parsed && parsed.isValid()) {
+          normalizedPhone = parsed.format('E.164');
+        } else {
+          const parsedWithDefault = parsePhoneNumberFromString(rawPhone, 'IN');
+          if (parsedWithDefault && parsedWithDefault.isValid()) {
+            normalizedPhone = parsedWithDefault.format('E.164');
+          } else {
+            return res.status(400).json({ success: false, message: 'Please enter a valid phone number.' });
+          }
+        }
+      } catch (e) {
+        return res.status(400).json({ success: false, message: 'Please enter a valid phone number.' });
+      }
+
+      if (normalizedPhone !== tenant.phone) {
+        const phoneInOwner = await Owner.findOne({ contactNumber: normalizedPhone });
+        const phoneInTenant = await Tenant.findOne({ _id: { $ne: tenant._id }, phone: normalizedPhone });
+        if (phoneInOwner || phoneInTenant) {
+          return res.status(400).json({ success: false, message: 'Phone number already registered in system.' });
+        }
+      }
+      tenant.phone = normalizedPhone;
+    }
     if (gender) tenant.gender = gender;
+    if (dateOfBirth !== undefined) tenant.dateOfBirth = dateOfBirth ? new Date(dateOfBirth) : null;
+    if (address !== undefined) tenant.address = address;
     if (unitNumber !== undefined) tenant.unitNumber = unitNumber;
     if (occupation !== undefined) tenant.occupation = occupation;
     if (panNumber !== undefined) tenant.panNumber = panNumber;
     if (aadhaarNumber !== undefined) tenant.aadhaarNumber = aadhaarNumber;
+    if (req.body.profilePhoto !== undefined) tenant.profilePhoto = req.body.profilePhoto;
     if (monthlyRent !== undefined) tenant.monthlyRent = parseFloat(monthlyRent);
     if (securityDeposit !== undefined) tenant.securityDeposit = parseFloat(securityDeposit);
     if (leaseStartDate) tenant.leaseStartDate = new Date(leaseStartDate);
     if (leaseEndDate) tenant.leaseEndDate = new Date(leaseEndDate);
     if (isActive !== undefined) tenant.isActive = isActive === 'true' || isActive === true;
+
+    // Password change through update if provided
+    const pwdToSet = newPassword || password;
+    if (pwdToSet !== undefined && pwdToSet !== null && String(pwdToSet).trim() !== '') {
+      const trimmedPwd = String(pwdToSet).trim();
+      if (trimmedPwd.length < 6) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long.' });
+      }
+      tenant.password = trimmedPwd;
+    }
 
     if (emergencyName !== undefined || emergencyPhone !== undefined || emergencyRelation !== undefined) {
       tenant.emergencyContact = {
@@ -206,8 +333,44 @@ exports.updateTenant = async (req, res, next) => {
       };
     }
 
-    // Property assignment changes
-    if (propertyAssigned !== undefined) {
+    // Apartment assignment changes
+    if (apartmentAssigned !== undefined) {
+      const oldApartmentId = tenant.apartmentAssigned ? tenant.apartmentAssigned.toString() : null;
+      const newApartmentId = apartmentAssigned && mongoose.Types.ObjectId.isValid(apartmentAssigned) ? apartmentAssigned : null;
+
+      if (oldApartmentId !== newApartmentId) {
+        if (oldApartmentId) {
+          const oldApt = await Apartment.findById(oldApartmentId);
+          if (oldApt) {
+            oldApt.status = 'Vacant';
+            oldApt.tenant = null;
+            await oldApt.save();
+          }
+        }
+        if (newApartmentId) {
+          const newApt = await Apartment.findById(newApartmentId);
+          if (newApt) {
+            newApt.status = 'Occupied';
+            newApt.tenant = tenant._id;
+            await newApt.save();
+            tenant.unitNumber = newApt.number;
+            tenant.propertyAssigned = newApt.property;
+
+            // Ensure parent property is also synced
+            if (newApt.property) {
+              await Property.findByIdAndUpdate(newApt.property, {
+                tenant: tenant._id,
+                status: 'Occupied'
+              });
+            }
+          }
+        }
+        tenant.apartmentAssigned = newApartmentId;
+      }
+    }
+
+    // Property assignment changes (if apartment wasn't set or directly assigned)
+    if (propertyAssigned !== undefined && apartmentAssigned === undefined) {
       const oldPropertyId = tenant.propertyAssigned ? tenant.propertyAssigned.toString() : null;
       const newPropertyId = propertyAssigned && mongoose.Types.ObjectId.isValid(propertyAssigned) ? propertyAssigned : null;
 
@@ -236,7 +399,9 @@ exports.updateTenant = async (req, res, next) => {
 
     await logActivity(req.user.id, 'Owner', 'Tenant Updated', `Tenant details for '${tenant.name}' were updated.`, req);
 
-    const updatedTenant = await Tenant.findById(tenant._id).populate('propertyAssigned', 'name address status');
+    const updatedTenant = await Tenant.findById(tenant._id)
+      .populate('propertyAssigned', 'name address status monthlyRent')
+      .populate('apartmentAssigned', 'number floor areaSqFt status monthlyRent securityDeposit');
 
     res.status(200).json({
       success: true,
@@ -247,8 +412,117 @@ exports.updateTenant = async (req, res, next) => {
   }
 };
 
+// @desc    Assign Property & Apartment to Tenant
+// @route   PATCH /api/v1/tenants/:id/assign-property (also PUT)
+// @access  Private (Owner Only)
+exports.assignProperty = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Tenant ID' });
+    }
+
+    const tenant = await Tenant.findById(req.params.id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    if (tenant.owner.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    const { propertyId, apartmentId, unitNumber, monthlyRent, securityDeposit } = req.body;
+
+    const oldApartmentId = tenant.apartmentAssigned ? tenant.apartmentAssigned.toString() : null;
+    const oldPropertyId = tenant.propertyAssigned ? tenant.propertyAssigned.toString() : null;
+
+    let newProperty = null;
+    let newApartment = null;
+
+    if (apartmentId && mongoose.Types.ObjectId.isValid(apartmentId)) {
+      newApartment = await Apartment.findById(apartmentId);
+      if (newApartment) {
+        newProperty = await Property.findById(newApartment.property);
+      }
+    } else if (propertyId && mongoose.Types.ObjectId.isValid(propertyId)) {
+      newProperty = await Property.findById(propertyId);
+    }
+
+    // Vacate previous apartment if changing
+    if (oldApartmentId && (!newApartment || newApartment._id.toString() !== oldApartmentId)) {
+      const oldApt = await Apartment.findById(oldApartmentId);
+      if (oldApt) {
+        oldApt.status = 'Vacant';
+        oldApt.tenant = null;
+        await oldApt.save();
+      }
+    }
+
+    // Vacate previous property if changing
+    if (oldPropertyId && (!newProperty || newProperty._id.toString() !== oldPropertyId)) {
+      const oldProp = await Property.findById(oldPropertyId);
+      if (oldProp) {
+        oldProp.status = 'Vacant';
+        oldProp.tenant = null;
+        await oldProp.save();
+      }
+    }
+
+    // Occupy new apartment
+    if (newApartment) {
+      newApartment.status = 'Occupied';
+      newApartment.tenant = tenant._id;
+      await newApartment.save();
+      tenant.apartmentAssigned = newApartment._id;
+      tenant.unitNumber = unitNumber || newApartment.number;
+    } else {
+      tenant.apartmentAssigned = null;
+      if (unitNumber !== undefined) tenant.unitNumber = unitNumber;
+    }
+
+    // Occupy new property
+    if (newProperty) {
+      tenant.propertyAssigned = newProperty._id;
+      newProperty.status = 'Occupied';
+      newProperty.tenant = tenant._id;
+      await newProperty.save();
+    } else {
+      tenant.propertyAssigned = null;
+    }
+
+    if (monthlyRent !== undefined) tenant.monthlyRent = parseFloat(monthlyRent);
+    else if (newApartment) tenant.monthlyRent = newApartment.monthlyRent;
+    else if (newProperty) tenant.monthlyRent = newProperty.monthlyRent;
+
+    if (securityDeposit !== undefined) tenant.securityDeposit = parseFloat(securityDeposit);
+    else if (newApartment) tenant.securityDeposit = newApartment.securityDeposit;
+    else if (newProperty) tenant.securityDeposit = newProperty.securityDeposit;
+
+    await tenant.save();
+
+    await logActivity(
+      req.user.id,
+      'Owner',
+      'Property Assigned',
+      `Assigned ${newProperty ? newProperty.name : 'Unassigned'} (${tenant.unitNumber || 'No unit'}) to Tenant '${tenant.name}'.`,
+      req
+    );
+
+    const updated = await Tenant.findById(tenant._id)
+      .populate('propertyAssigned', 'name address status monthlyRent')
+      .populate('apartmentAssigned', 'number floor areaSqFt status monthlyRent securityDeposit');
+
+    res.status(200).json({
+      success: true,
+      message: 'Property/Apartment assignment updated successfully',
+      data: updated
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Reset Tenant Password (Owner Only)
-// @route   PUT /api/v1/tenants/:id/reset-password
+// @route   PUT /api/v1/tenants/:id/reset-password (also PATCH)
 // @access  Private (Owner Only)
 exports.resetTenantPassword = async (req, res, next) => {
   try {
@@ -256,7 +530,7 @@ exports.resetTenantPassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid Tenant ID' });
     }
 
-    const { newPassword } = req.body;
+    const newPassword = req.body.newPassword || req.body.password;
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
     }
@@ -284,8 +558,8 @@ exports.resetTenantPassword = async (req, res, next) => {
   }
 };
 
-// @desc    Toggle Tenant Active Status
-// @route   PUT /api/v1/tenants/:id/toggle-status
+// @desc    Toggle or Update Tenant Active Status
+// @route   PUT /api/v1/tenants/:id/toggle-status (also PATCH /api/v1/tenants/:id/status)
 // @access  Private (Owner Only)
 exports.toggleTenantStatus = async (req, res, next) => {
   try {
@@ -302,8 +576,21 @@ exports.toggleTenantStatus = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    tenant.isActive = !tenant.isActive;
+    if (req.body.isActive !== undefined) {
+      tenant.isActive = req.body.isActive === 'true' || req.body.isActive === true;
+    } else {
+      tenant.isActive = !tenant.isActive;
+    }
+
     await tenant.save();
+
+    await logActivity(
+      req.user.id,
+      'Owner',
+      'Tenant Status Changed',
+      `Tenant '${tenant.name}' status set to ${tenant.isActive ? 'Active' : 'Inactive'}.`,
+      req
+    );
 
     res.status(200).json({
       success: true,
@@ -506,6 +793,14 @@ exports.deactivateTenant = async (req, res, next) => {
     const forceDelete = req.query.force === 'true' || req.query.permanent === 'true' || req.body.force === true;
 
     if (forceDelete) {
+      if (tenant.apartmentAssigned) {
+        const apt = await Apartment.findById(tenant.apartmentAssigned);
+        if (apt) {
+          apt.status = 'Vacant';
+          apt.tenant = null;
+          await apt.save();
+        }
+      }
       if (tenant.propertyAssigned) {
         const prop = await Property.findById(tenant.propertyAssigned);
         if (prop) {
@@ -523,6 +818,15 @@ exports.deactivateTenant = async (req, res, next) => {
     }
 
     // Soft delete / deactivate
+    if (tenant.apartmentAssigned) {
+      const apt = await Apartment.findById(tenant.apartmentAssigned);
+      if (apt) {
+        apt.status = 'Vacant';
+        apt.tenant = null;
+        await apt.save();
+      }
+      tenant.apartmentAssigned = null;
+    }
     if (tenant.propertyAssigned) {
       const prop = await Property.findById(tenant.propertyAssigned);
       if (prop) {

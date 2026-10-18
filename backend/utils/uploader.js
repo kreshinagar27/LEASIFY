@@ -24,13 +24,21 @@ if (isCloudinaryConfigured) {
 const uploadToStorage = async (file, folder = 'leasify') => {
   if (!file) return null;
 
-  try {
-    if (isCloudinaryConfigured) {
-      const result = await cloudinary.uploader.upload(file.path, {
-        folder: folder,
-        resource_type: 'auto'
+  if (isCloudinaryConfigured) {
+    try {
+      // 4-second timeout to prevent request hanging if remote cloud is unreachable
+      const result = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Cloudinary request timed out')), 4000);
+        cloudinary.uploader.upload(file.path, {
+          folder: folder,
+          resource_type: 'auto'
+        }, (err, res) => {
+          clearTimeout(timer);
+          if (err) reject(err);
+          else resolve(res);
+        });
       });
-      // Delete temporary local file
+
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
       }
@@ -38,21 +46,17 @@ const uploadToStorage = async (file, folder = 'leasify') => {
         url: result.secure_url,
         publicId: result.public_id
       };
-    } else {
-      // Return relative path. The app.js must serve the 'uploads' directory statically.
-      return {
-        url: `/uploads/${file.filename}`,
-        publicId: file.filename
-      };
+    } catch (cloudErr) {
+      console.warn(`[Storage] Cloudinary upload unavailable (${cloudErr.message}). Using persistent local disk storage.`);
+      // Gracefully fall back to local disk storage
     }
-  } catch (error) {
-    console.error('File Upload Error:', error);
-    // If Cloudinary upload failed, clean up local file anyway
-    if (fs.existsSync(file.path)) {
-      fs.unlinkSync(file.path);
-    }
-    throw error;
   }
+
+  // Persistent Local Disk Storage (served via Express /uploads)
+  return {
+    url: `/uploads/${file.filename}`,
+    publicId: file.filename
+  };
 };
 
 /**
@@ -60,12 +64,12 @@ const uploadToStorage = async (file, folder = 'leasify') => {
  * If Cloudinary is configured, deletes from Cloudinary.
  * If not, deletes from local uploads folder.
  */
-const deleteFromStorage = async (publicId) => {
+const deleteFromStorage = async (publicId, resourceType = 'image') => {
   if (!publicId) return;
 
   try {
     if (isCloudinaryConfigured) {
-      await cloudinary.uploader.destroy(publicId);
+      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
     } else {
       const localFilePath = path.join(__dirname, '../uploads', publicId);
       if (fs.existsSync(localFilePath)) {

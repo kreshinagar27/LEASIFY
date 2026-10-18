@@ -45,6 +45,14 @@ const TenantSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  dateOfBirth: {
+    type: Date,
+    default: null
+  },
+  address: {
+    type: String,
+    default: ''
+  },
   emergencyContact: {
     name: { type: String, default: '' },
     phone: { type: String, default: '' },
@@ -76,21 +84,26 @@ const TenantSchema = new mongoose.Schema({
     ref: 'Property',
     default: null
   },
+  apartmentAssigned: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Apartment',
+    default: null
+  },
   monthlyRent: {
     type: Number,
-    required: [true, 'Please specify monthly rent']
+    default: 0
   },
   securityDeposit: {
     type: Number,
-    required: [true, 'Please specify security deposit']
+    default: 0
   },
   leaseStartDate: {
     type: Date,
-    required: [true, 'Please specify lease start date']
+    default: Date.now
   },
   leaseEndDate: {
     type: Date,
-    required: [true, 'Please specify lease end date']
+    default: () => new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
   },
   leaseRenewals: [
     {

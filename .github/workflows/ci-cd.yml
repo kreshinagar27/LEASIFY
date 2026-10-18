@@ -10,19 +10,23 @@ jobs:
   backend-tests:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Use Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-size: 18.x
+        node-version: 20.x
         cache: 'npm'
         cache-dependency-path: 'backend/package-lock.json'
         
     - name: Install dependencies
       run: |
         cd backend
+
+
+        
         npm install
+
         
     - name: Run lint & checks
       run: |
@@ -34,12 +38,12 @@ jobs:
   frontend-build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Use Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
-        node-version: 18.x
+        node-version: 20.x
         cache: 'npm'
         cache-dependency-path: 'frontend/package-lock.json'
         

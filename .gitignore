@@ -15,3 +15,12 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+backend/data/
+data/
+# Runtime uploads and user-generated media
+backend/uploads/
+
+# Test screenshots and temporary test images
+backend/test-screenshots/
+backend/test_image_*.png
+backend/mobile-phone-test.png
