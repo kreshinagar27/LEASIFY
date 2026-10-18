@@ -1,6 +1,6 @@
 LEASIFY-
 1) password change problem
-2) real data on front page 
-3) map integration
-4) entry animation
-5) logo visibility
+2) entry animation
+3) fix space 
+4) demo payment data ( don't change other data )
+5) favicon

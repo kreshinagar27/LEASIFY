@@ -62,6 +62,26 @@
 }
 
 @layer base {
+  *, ::before, ::after {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-height: 100vh;
+    min-height: 100dvh;
+    position: relative;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    display: flex;
+    flex-direction: column;
+  }
+
   html {
     scroll-behavior: smooth;
     color-scheme: light dark;
@@ -377,25 +397,25 @@ tbody td {
 /* ========================================================= */
 @keyframes kenburns-pan-zoom-1 {
   0% {
-    transform: scale(1) translate(0%, 0%);
+    transform: scale(1.08) translate(0%, 0%);
   }
   50% {
-    transform: scale(1.08) translate(-1.5%, -1%);
+    transform: scale(1.15) translate(-1.2%, -0.8%);
   }
   100% {
-    transform: scale(1.03) translate(1%, 0.8%);
+    transform: scale(1.10) translate(0.8%, -0.5%);
   }
 }
 
 @keyframes kenburns-pan-zoom-2 {
   0% {
-    transform: scale(1.06) translate(1%, -0.5%);
+    transform: scale(1.12) translate(0.8%, -0.5%);
   }
   50% {
-    transform: scale(1) translate(-0.8%, 1%);
+    transform: scale(1.08) translate(-0.6%, -0.2%);
   }
   100% {
-    transform: scale(1.07) translate(-1%, -1%);
+    transform: scale(1.15) translate(-0.8%, -0.8%);
   }
 }
 
@@ -413,3 +433,38 @@ tbody td {
     animation: none !important;
   }
 }
+
+/* Custom Leaflet Map styling for Leasify */
+.leaflet-popup-content-wrapper {
+  background: #FAF7F1 !important;
+  color: #38251F !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 10px 25px -5px rgba(53, 35, 31, 0.25) !important;
+  border: 1px solid #D9CABB !important;
+  padding: 0 !important;
+}
+
+.dark .leaflet-popup-content-wrapper {
+  background: #261714 !important;
+  color: #FAF7F1 !important;
+  border-color: #49312A !important;
+}
+
+.leaflet-popup-content {
+  margin: 10px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: #FAF7F1 !important;
+}
+
+.dark .leaflet-popup-tip {
+  background: #261714 !important;
+}
+
+.leasify-map-pin {
+  background: transparent !important;
+  border: none !important;
+}
+

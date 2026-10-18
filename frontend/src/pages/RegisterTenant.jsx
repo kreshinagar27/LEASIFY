@@ -44,12 +44,12 @@ const RegisterTenant = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between text-[#35231F] dark:text-[#F7EFE5] p-4 py-8 relative overflow-hidden selection:bg-[#4B1715] selection:text-[#FAF7F0]">
+    <div className="min-h-screen flex flex-col justify-between text-[#35231F] dark:text-[#F7EFE5] m-0 p-0 relative overflow-y-auto selection:bg-[#4B1715] selection:text-[#FAF7F0]">
       {/* Background House Animation */}
       <PropertyBackground fixed={true} overlayOpacity="dense" />
 
-      {/* Top Header Navigation */}
-      <div className="max-w-xl w-full mx-auto flex items-center justify-between mb-4 z-10">
+      {/* Top Header Navigation - Full Width Edge-to-Edge */}
+      <header className="w-full z-20 px-6 sm:px-10 lg:px-16 py-4 sm:py-5 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
           <img
             src="/logo-dark.png"
@@ -78,10 +78,11 @@ const RegisterTenant = () => {
             </>
           )}
         </button>
-      </div>
+      </header>
 
-      {/* Main Container */}
-      <div className="w-full max-w-xl mx-auto glass-panel-elevated rounded-[2rem] p-6 sm:p-8 md:p-10 border border-[#D9CBBB] dark:border-[#38251F] shadow-2xl relative z-10 my-auto">
+      {/* Main Container Section */}
+      <main className="flex-1 flex items-center justify-center p-4 py-2 z-10 w-full">
+        <div className="w-full max-w-xl glass-panel-elevated rounded-[2rem] p-6 sm:p-8 md:p-10 border border-[#D9CBBB] dark:border-[#38251F] shadow-2xl relative">
         <div className="mb-6">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E9DFD0] dark:bg-[#2A1D18] text-[#4A1715] dark:text-[#E9DFD0] text-[11px] font-bold mb-2 border border-[#D9CBBB] dark:border-[#4A1715]">
             <Key className="w-3.5 h-3.5" /> Resident Tenant Portal Setup
@@ -221,11 +222,13 @@ const RegisterTenant = () => {
             </Link>
           </span>
         </div>
-      </div>
+        </div>
+      </main>
 
-      <div className="max-w-xl w-full mx-auto text-center text-xs text-[#78685D] dark:text-[#78685D] pt-4 z-10">
+      {/* Footer */}
+      <footer className="w-full text-center text-xs text-[#78685D] dark:text-[#C5B5A5] py-3 z-10">
         © {new Date().getFullYear()} Leasify Cloud Inc. All rights reserved.
-      </div>
+      </footer>
     </div>
   );
 };

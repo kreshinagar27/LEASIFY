@@ -44,6 +44,7 @@ const Properties = () => {
   const [maxRent, setMaxRent] = useState('');
 
   const [deleteModalState, setDeleteModalState] = useState(null);
+  const [editingProperty, setEditingProperty] = useState(null);
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -101,6 +102,93 @@ const Properties = () => {
     }
   };
 
+  const openAddModal = () => {
+    setEditingProperty(null);
+    reset({
+      name: '',
+      category: 'Residential',
+      type: 'apartment',
+      furnishedStatus: 'furnished',
+      parkingType: 'Four-Wheeler',
+      facingDirection: 'East',
+      floorNumber: 1,
+      totalFloors: 5,
+      bedrooms: 2,
+      bathrooms: 2,
+      balconies: 1,
+      propertyAge: 2,
+      areaSqFt: 1000,
+      carpetAreaSqFt: 850,
+      builtUpAreaSqFt: 950,
+      monthlyRent: 15000,
+      securityDeposit: 30000,
+      maintenanceCharges: 0,
+      electricityCharges: 0,
+      waterCharges: 0,
+      houseNumber: '',
+      street: '',
+      area: '',
+      city: '',
+      state: '',
+      pincode: '',
+      country: 'India',
+      description: ''
+    });
+    setLat(12.9716);
+    setLng(77.5946);
+    setSelectedAmenities([]);
+    setActiveTab('basic');
+    setModalOpen(true);
+  };
+
+  const openEditModal = (prop) => {
+    setEditingProperty(prop);
+    reset({
+      name: prop.name || '',
+      category: prop.category || 'Residential',
+      type: prop.type || 'apartment',
+      furnishedStatus: prop.furnishedStatus || 'furnished',
+      parkingType: prop.parkingType || 'Four-Wheeler',
+      facingDirection: prop.facingDirection || 'East',
+      floorNumber: prop.floorNumber ?? 1,
+      totalFloors: prop.totalFloors ?? 5,
+      bedrooms: prop.bedrooms ?? 2,
+      bathrooms: prop.bathrooms ?? 2,
+      balconies: prop.balconies ?? (prop.balcony ? 1 : 0),
+      propertyAge: prop.propertyAge ?? 2,
+      areaSqFt: prop.areaSqFt ?? 1000,
+      carpetAreaSqFt: prop.carpetAreaSqFt ?? 0,
+      builtUpAreaSqFt: prop.builtUpAreaSqFt ?? 0,
+      monthlyRent: prop.monthlyRent ?? 15000,
+      securityDeposit: prop.securityDeposit ?? 30000,
+      maintenanceCharges: prop.maintenanceCharges ?? 0,
+      electricityCharges: prop.electricityCharges ?? 0,
+      waterCharges: prop.waterCharges ?? 0,
+      availableFromDate: prop.availableFromDate ? new Date(prop.availableFromDate).toISOString().split('T')[0] : '',
+      houseNumber: prop.address?.houseNumber || '',
+      street: prop.address?.street || '',
+      area: prop.address?.area || '',
+      city: prop.address?.city || '',
+      state: prop.address?.state || '',
+      country: prop.address?.country || 'India',
+      pincode: prop.address?.pincode || '',
+      description: prop.description || ''
+    });
+
+    const coords = prop.location?.coordinates;
+    if (Array.isArray(coords) && coords.length >= 2 && !isNaN(coords[1]) && !isNaN(coords[0]) && (coords[0] !== 0 || coords[1] !== 0)) {
+      setLat(Number(coords[1]));
+      setLng(Number(coords[0]));
+    } else {
+      setLat(12.9716);
+      setLng(77.5946);
+    }
+
+    setSelectedAmenities(prop.amenities || []);
+    setActiveTab('basic');
+    setModalOpen(true);
+  };
+
   const onSubmit = async (data) => {
     try {
       const formData = {
@@ -110,16 +198,27 @@ const Properties = () => {
         longitude: lng
       };
 
-      const res = await apiClient.post('/properties', formData);
-      if (res.data.success) {
-        toast.success('Property created successfully!');
-        setModalOpen(false);
-        reset();
-        setSelectedAmenities([]);
-        fetchProperties();
+      if (editingProperty) {
+        const res = await apiClient.put(`/properties/${editingProperty._id}`, formData);
+        if (res.data.success) {
+          toast.success('Property and map address updated successfully!');
+          setModalOpen(false);
+          setEditingProperty(null);
+          reset();
+          fetchProperties();
+        }
+      } else {
+        const res = await apiClient.post('/properties', formData);
+        if (res.data.success) {
+          toast.success('Property created successfully!');
+          setModalOpen(false);
+          reset();
+          setSelectedAmenities([]);
+          fetchProperties();
+        }
       }
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to add property.');
+      toast.error(error.response?.data?.message || (editingProperty ? 'Failed to update property.' : 'Failed to add property.'));
     }
   };
 
@@ -162,10 +261,7 @@ const Properties = () => {
           <p className="text-xs text-[#78685D] dark:text-[#C5B5A5]">Add, track, and manage all your real estate rental assets.</p>
         </div>
         <button
-          onClick={() => {
-            setModalOpen(true);
-            setActiveTab('basic');
-          }}
+          onClick={openAddModal}
           className="px-5 py-2.5 btn-primary-glow text-[#FAF7F1] font-bold text-xs rounded-full shadow-lg flex items-center gap-2 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Add New Property
@@ -336,6 +432,13 @@ const Properties = () => {
                       <Eye className="w-3.5 h-3.5" /> View Details
                     </Link>
                     <button
+                      onClick={() => openEditModal(prop)}
+                      className="p-2 text-[#6B5A4E] hover:text-[#C59B27] hover:bg-[#E9DFD0] dark:hover:bg-[#2A1D18] rounded-full transition-colors border border-[#D9CBBB]/80 dark:border-[#38251F] cursor-pointer"
+                      title="Edit Property & Map Address"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => handleDelete(prop._id, prop.name)}
                       className="p-2 text-rose-600 hover:bg-rose-500/10 rounded-full transition-colors border border-rose-500/20 cursor-pointer"
                       title="Delete Property"
@@ -356,10 +459,14 @@ const Properties = () => {
           <div className="w-full max-w-3xl glass-panel-elevated rounded-[2rem] border border-[#D9CBBB] dark:border-[#38251F] p-6 flex flex-col relative max-h-[92vh] overflow-y-auto shadow-2xl bg-[#FAF7F1] dark:bg-[#1C1614]">
             <div className="flex justify-between items-center pb-3 border-b border-[#D9CBBB]/70 dark:border-[#38251F] mb-4">
               <div>
-                <h3 className="font-extrabold text-lg text-[#38251F] dark:text-[#FAF7F1] Outfit">Add New Property Unit</h3>
-                <p className="text-xs text-[#78685D]">Fill in detailed real-estate specs, pricing, address & amenities.</p>
+                <h3 className="font-extrabold text-lg text-[#38251F] dark:text-[#FAF7F1] Outfit">
+                  {editingProperty ? 'Edit Property & Map Address' : 'Add New Property Unit'}
+                </h3>
+                <p className="text-xs text-[#78685D]">
+                  {editingProperty ? 'Update property details, address, and interactive GPS map location.' : 'Fill in detailed real-estate specs, pricing, address & amenities.'}
+                </p>
               </div>
-              <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
+              <button onClick={() => { setModalOpen(false); setEditingProperty(null); }} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
             </div>
 
             {/* TAB NAVIGATION */}
@@ -688,7 +795,7 @@ const Properties = () => {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setModalOpen(false)}
+                    onClick={() => { setModalOpen(false); setEditingProperty(null); }}
                     className="px-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"
                   >
                     Cancel
@@ -697,7 +804,7 @@ const Properties = () => {
                     type="submit"
                     className="px-5 py-2 text-xs font-semibold text-white bg-brand-500 hover:bg-brand-600 rounded-xl shadow-lg shadow-brand-500/25 transition-all"
                   >
-                    Save Property
+                    {editingProperty ? 'Update Property' : 'Save Property'}
                   </button>
                 </div>
               </div>

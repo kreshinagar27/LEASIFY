@@ -118,6 +118,34 @@ exports.createApartment = async (req, res, next) => {
       images
     });
 
+    if (req.body.latitude !== undefined || req.body.longitude !== undefined || req.body.address || req.body.street || req.body.city || req.body.area) {
+      const propUpdate = {};
+      if (req.body.address && typeof req.body.address === 'object') {
+        propUpdate.address = req.body.address;
+      } else if (req.body.street !== undefined || req.body.city !== undefined || req.body.area !== undefined || req.body.pincode !== undefined || req.body.state !== undefined || req.body.houseNumber !== undefined) {
+        propUpdate.address = {
+          houseNumber: req.body.houseNumber !== undefined ? req.body.houseNumber : (property.address?.houseNumber || ''),
+          street: req.body.street !== undefined ? req.body.street : (property.address?.street || ''),
+          area: req.body.area !== undefined ? req.body.area : (property.address?.area || ''),
+          city: req.body.city !== undefined ? req.body.city : (property.address?.city || ''),
+          state: req.body.state !== undefined ? req.body.state : (property.address?.state || ''),
+          country: req.body.country !== undefined ? req.body.country : (property.address?.country || 'India'),
+          pincode: req.body.pincode !== undefined ? req.body.pincode : (property.address?.pincode || '')
+        };
+      }
+      const latVal = req.body.latitude !== undefined && req.body.latitude !== '' ? req.body.latitude : req.body.location?.coordinates?.[1];
+      const lngVal = req.body.longitude !== undefined && req.body.longitude !== '' ? req.body.longitude : req.body.location?.coordinates?.[0];
+      if (latVal !== undefined && lngVal !== undefined && latVal !== '' && lngVal !== '' && !isNaN(latVal) && !isNaN(lngVal)) {
+        propUpdate.location = {
+          type: 'Point',
+          coordinates: [parseFloat(lngVal), parseFloat(latVal)]
+        };
+      }
+      if (Object.keys(propUpdate).length > 0) {
+        await Property.findByIdAndUpdate(property._id, propUpdate);
+      }
+    }
+
     await logActivity(req.user.id, 'Owner', 'Apartment Added', `Apartment '${apartment.number}' created for property '${property.name}'.`, req);
 
     res.status(201).json({ success: true, data: apartment });
@@ -134,7 +162,7 @@ exports.getApartments = async (req, res, next) => {
     // Find properties owned by the user and then apartments linked to them
     const ownedProperties = await Property.find({ owner: req.user.id }).select('_id');
     const propertyIds = ownedProperties.map(p => p._id);
-    const apartments = await Apartment.find({ property: { $in: propertyIds } }).populate('property', 'name address status owner');
+    const apartments = await Apartment.find({ property: { $in: propertyIds } }).populate('property', 'name address status location owner');
     res.status(200).json({ success: true, count: apartments.length, data: apartments });
   } catch (error) {
     next(error);
@@ -227,7 +255,41 @@ exports.updateApartment = async (req, res, next) => {
       }
     }
 
-    apartment = await Apartment.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true }).populate('property', 'name address status');
+    const targetPropId = updateData.property || apartment.property?._id || apartment.property;
+    if (targetPropId && (req.body.latitude !== undefined || req.body.longitude !== undefined || req.body.address || req.body.street || req.body.city || req.body.area)) {
+      const propUpdate = {};
+      if (req.body.address && typeof req.body.address === 'object') {
+        propUpdate.address = req.body.address;
+      } else if (req.body.street !== undefined || req.body.city !== undefined || req.body.area !== undefined || req.body.pincode !== undefined || req.body.state !== undefined || req.body.houseNumber !== undefined) {
+        const existingProp = await Property.findById(targetPropId);
+        if (existingProp) {
+          propUpdate.address = {
+            houseNumber: req.body.houseNumber !== undefined ? req.body.houseNumber : (existingProp.address?.houseNumber || ''),
+            street: req.body.street !== undefined ? req.body.street : (existingProp.address?.street || ''),
+            area: req.body.area !== undefined ? req.body.area : (existingProp.address?.area || ''),
+            city: req.body.city !== undefined ? req.body.city : (existingProp.address?.city || ''),
+            state: req.body.state !== undefined ? req.body.state : (existingProp.address?.state || ''),
+            country: req.body.country !== undefined ? req.body.country : (existingProp.address?.country || 'India'),
+            pincode: req.body.pincode !== undefined ? req.body.pincode : (existingProp.address?.pincode || '')
+          };
+        }
+      }
+
+      const latVal = req.body.latitude !== undefined && req.body.latitude !== '' ? req.body.latitude : req.body.location?.coordinates?.[1];
+      const lngVal = req.body.longitude !== undefined && req.body.longitude !== '' ? req.body.longitude : req.body.location?.coordinates?.[0];
+      if (latVal !== undefined && lngVal !== undefined && latVal !== '' && lngVal !== '' && !isNaN(latVal) && !isNaN(lngVal)) {
+        propUpdate.location = {
+          type: 'Point',
+          coordinates: [parseFloat(lngVal), parseFloat(latVal)]
+        };
+      }
+
+      if (Object.keys(propUpdate).length > 0) {
+        await Property.findByIdAndUpdate(targetPropId, propUpdate);
+      }
+    }
+
+    apartment = await Apartment.findByIdAndUpdate(req.params.id, updateData, { new: true, runValidators: true }).populate('property', 'name address status location');
     await logActivity(req.user.id, 'Owner', 'Apartment Updated', `Apartment '${apartment.number}' updated.`, req);
     res.status(200).json({ success: true, data: apartment });
   } catch (error) {

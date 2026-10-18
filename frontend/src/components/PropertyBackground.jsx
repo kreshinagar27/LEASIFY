@@ -52,7 +52,7 @@ const PropertyBackground = ({
     <div
       aria-hidden="true"
       className={`${
-        fixed ? 'fixed inset-0' : 'absolute inset-0'
+        fixed ? 'fixed -top-4 -bottom-4 -left-4 -right-4' : 'absolute -top-4 -bottom-4 -left-4 -right-4'
       } overflow-hidden pointer-events-none -z-20 select-none`}
     >
       {/* 1. VIDEO LAYER (if available or configured) */}
@@ -85,7 +85,7 @@ const PropertyBackground = ({
                   src={slide.image}
                   alt={slide.title}
                   loading={idx === 0 ? 'eager' : 'lazy'}
-                  className={`w-full h-full object-cover object-center ${motionClass} will-change-transform`}
+                  className={`w-full h-full object-cover object-center scale-105 ${motionClass} will-change-transform`}
                 />
               </div>
             );

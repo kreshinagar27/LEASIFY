@@ -37,13 +37,13 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#EAE1D4] dark:bg-[#211A16] text-[#39251F] dark:text-[#F6EEE3] p-4 py-8 relative overflow-hidden transition-colors duration-200">
+    <div className="min-h-screen flex flex-col justify-between bg-[#EAE1D4] dark:bg-[#211A16] text-[#39251F] dark:text-[#F6EEE3] m-0 p-0 relative overflow-y-auto transition-colors duration-200">
       {/* Background Ambient Warm Glows for Frosted Glass Depth */}
-      <div className="fixed top-12 left-1/4 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(213,187,151,0.45)_0%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(117,64,57,0.22)_0%,transparent_70%)] pointer-events-none blur-3xl -z-10" />
+      <div className="fixed top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(213,187,151,0.45)_0%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(117,64,57,0.22)_0%,transparent_70%)] pointer-events-none blur-3xl -z-10" />
       <div className="fixed bottom-10 right-1/4 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(161,117,91,0.30)_0%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(140,85,60,0.18)_0%,transparent_70%)] pointer-events-none blur-3xl -z-10" />
 
-      {/* Top Header Navigation */}
-      <div className="max-w-md w-full mx-auto flex items-center justify-between mb-4 z-10">
+      {/* Top Header Navigation - Full Width Edge-to-Edge */}
+      <header className="w-full z-20 px-6 sm:px-10 lg:px-16 py-4 sm:py-5 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
           <img
             src="/logo-dark.png"
@@ -66,9 +66,10 @@ const ResetPassword = () => {
             <Moon className="w-4 h-4 text-[#4A1917]" />
           )}
         </button>
-      </div>
+      </header>
 
-      <div className="w-full max-w-md mx-auto glass-panel-elevated rounded-[2rem] p-6 sm:p-8 border border-[#D9CBBB] dark:border-[#38251F] shadow-2xl relative z-10 my-auto">
+      <main className="flex-1 flex items-center justify-center p-4 py-2 z-10 w-full">
+        <div className="w-full max-w-md glass-panel-elevated rounded-[2rem] p-6 sm:p-8 border border-[#D9CBBB] dark:border-[#38251F] shadow-2xl relative">
         {complete ? (
           <div className="text-center py-4">
             <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 flex items-center justify-center mx-auto mb-4 border border-emerald-500/20 shadow-lg shadow-emerald-500/10">
@@ -154,11 +155,13 @@ const ResetPassword = () => {
             </form>
           </div>
         )}
-      </div>
+        </div>
+      </main>
 
-      <div className="max-w-md w-full mx-auto text-center text-xs text-[#78685D] dark:text-[#78685D] pt-4 z-10">
-        © {new Date().getFullYear()} Leasify Cloud Inc.
-      </div>
+      {/* Footer */}
+      <footer className="w-full text-center text-xs text-[#78685D] dark:text-[#C5B5A5] py-3 z-10">
+        © {new Date().getFullYear()} Leasify Cloud Inc. All rights reserved.
+      </footer>
     </div>
   );
 };

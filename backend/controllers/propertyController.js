@@ -153,7 +153,12 @@ exports.addProperty = async (req, res, next) => {
 // @access  Private (Owner Only)
 exports.getProperties = async (req, res, next) => {
   try {
-    const queryObj = { owner: req.user.id };
+    const queryObj = {};
+    if (req.userRole === 'owner') {
+      queryObj.owner = req.user.id;
+    } else {
+      queryObj.isArchived = { $ne: true };
+    }
 
     // Search query across name, city, street
     if (req.query.search) {
@@ -388,21 +393,24 @@ exports.updateProperty = async (req, res, next) => {
       status: status || property.status,
       images,
       address: {
-        houseNumber: houseNumber || property.address.houseNumber,
-        street: street || property.address.street,
-        area: area || property.address.area,
-        city: city || property.address.city,
-        state: state || property.address.state,
-        country: country || property.address.country,
-        pincode: pincode || property.address.pincode
+        houseNumber: houseNumber !== undefined ? houseNumber : (property.address?.houseNumber || ''),
+        street: street !== undefined ? street : (property.address?.street || ''),
+        area: area !== undefined ? area : (property.address?.area || ''),
+        city: city !== undefined ? city : (property.address?.city || ''),
+        state: state !== undefined ? state : (property.address?.state || ''),
+        country: country !== undefined ? country : (property.address?.country || 'India'),
+        pincode: pincode !== undefined ? pincode : (property.address?.pincode || '')
       },
       nearbyFacilities: nearbyList || property.nearbyFacilities
     };
 
-    if (longitude && latitude) {
+    const latVal = latitude !== undefined && latitude !== '' ? latitude : (req.body.location?.coordinates?.[1]);
+    const lngVal = longitude !== undefined && longitude !== '' ? longitude : (req.body.location?.coordinates?.[0]);
+
+    if (latVal !== undefined && lngVal !== undefined && latVal !== '' && lngVal !== '' && !isNaN(latVal) && !isNaN(lngVal)) {
       updateData.location = {
         type: 'Point',
-        coordinates: [parseFloat(longitude), parseFloat(latitude)]
+        coordinates: [parseFloat(lngVal), parseFloat(latVal)]
       };
     }
 
@@ -865,6 +873,146 @@ exports.reorderPropertyMedia = async (req, res, next) => {
       success: true,
       message: 'Gallery order updated successfully.',
       data: property.media
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Geocode address search string to coordinates
+// @route   GET /api/v1/properties/geocode?q=...
+// @access  Private
+exports.geocodeAddress = async (req, res, next) => {
+  try {
+    const query = req.query.q;
+    if (!query || !query.trim()) {
+      return res.status(400).json({ success: false, message: 'Search query is required' });
+    }
+
+    // Tier 1: Photon OpenStreetMap API
+    try {
+      const photonRes = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`);
+      if (photonRes.ok) {
+        const photonData = await photonRes.json();
+        if (photonData.features && photonData.features.length > 0) {
+          const results = photonData.features.map(f => {
+            const props = f.properties || {};
+            const coords = f.geometry?.coordinates || [];
+            const labelParts = [props.name, props.street, props.district, props.city, props.state, props.country].filter(Boolean);
+            return {
+              lat: coords[1],
+              lng: coords[0],
+              displayName: labelParts.join(', ') || props.name || 'Location',
+              city: props.city || props.district || '',
+              state: props.state || '',
+              country: props.country || 'India',
+              pincode: props.postcode || ''
+            };
+          });
+          return res.status(200).json({ success: true, data: results });
+        }
+      }
+    } catch (photonErr) {
+      console.warn('Photon geocode fallback:', photonErr.message);
+    }
+
+    // Tier 2: Nominatim with custom User-Agent
+    try {
+      const nomRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}`, {
+        headers: { 'User-Agent': 'LeasifyRentalManagement/1.0 (contact@leasify.internal)' }
+      });
+      if (nomRes.ok) {
+        const nomData = await nomRes.json();
+        if (Array.isArray(nomData) && nomData.length > 0) {
+          const results = nomData.map(item => ({
+            lat: parseFloat(item.lat),
+            lng: parseFloat(item.lon),
+            displayName: item.display_name,
+            pincode: ''
+          }));
+          return res.status(200).json({ success: true, data: results });
+        }
+      }
+    } catch (nomErr) {
+      console.warn('Nominatim geocode fallback:', nomErr.message);
+    }
+
+    res.status(404).json({ success: false, message: 'Location not found' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reverse geocode coordinates to address string
+// @route   GET /api/v1/properties/reverse-geocode?lat=...&lng=...
+// @access  Private
+exports.reverseGeocodeCoordinates = async (req, res, next) => {
+  try {
+    const { lat, lng } = req.query;
+    if (!lat || !lng) {
+      return res.status(400).json({ success: false, message: 'Latitude and longitude are required' });
+    }
+
+    // Tier 1: Photon reverse
+    try {
+      const photonRes = await fetch(`https://photon.komoot.io/reverse?lon=${encodeURIComponent(lng)}&lat=${encodeURIComponent(lat)}`);
+      if (photonRes.ok) {
+        const photonData = await photonRes.json();
+        if (photonData.features && photonData.features.length > 0) {
+          const props = photonData.features[0].properties || {};
+          const labelParts = [props.name, props.street, props.district, props.city, props.state, props.country].filter(Boolean);
+          return res.status(200).json({
+            success: true,
+            data: {
+              displayName: labelParts.join(', ') || props.name || 'Current Location',
+              name: props.name || '',
+              street: props.street || '',
+              area: props.district || props.suburb || props.locality || '',
+              city: props.city || '',
+              state: props.state || '',
+              country: props.country || 'India',
+              pincode: props.postcode || ''
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Photon reverse fallback:', err.message);
+    }
+
+    // Tier 2: Nominatim reverse
+    try {
+      const nomRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}`, {
+        headers: { 'User-Agent': 'LeasifyRentalManagement/1.0 (contact@leasify.internal)' }
+      });
+      if (nomRes.ok) {
+        const nomData = await nomRes.json();
+        if (nomData && nomData.display_name) {
+          const addr = nomData.address || {};
+          return res.status(200).json({
+            success: true,
+            data: {
+              displayName: nomData.display_name,
+              name: addr.road || addr.suburb || '',
+              street: addr.road || '',
+              area: addr.suburb || addr.neighbourhood || addr.residential || '',
+              city: addr.city || addr.town || addr.county || '',
+              state: addr.state || '',
+              country: addr.country || 'India',
+              pincode: addr.postcode || ''
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Nominatim reverse fallback:', err.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        displayName: `Location at ${Number(lat).toFixed(4)}, ${Number(lng).toFixed(4)}`
+      }
     });
   } catch (error) {
     next(error);

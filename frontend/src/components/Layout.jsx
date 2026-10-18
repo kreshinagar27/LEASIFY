@@ -111,9 +111,9 @@ const Layout = ({ children }) => {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    <div className="min-h-screen flex bg-[#EAE1D4] dark:bg-[#211A16] text-[#39251F] dark:text-[#F6EEE3] transition-colors duration-300 font-sans selection:bg-[#4A1917] selection:text-[#FAF7F1] relative overflow-x-hidden">
+    <div className="min-h-screen flex w-full bg-[#F5EEE3] dark:bg-[#1B100E] m-0 p-0 text-[#39251F] dark:text-[#F6EEE3] transition-colors duration-300 font-sans selection:bg-[#4A1917] selection:text-[#FAF7F1] relative overflow-x-hidden">
       {/* Background Ambient Warm Glows for Frosted Glass Depth */}
-      <div className="fixed top-12 left-1/4 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(213,187,151,0.45)_0%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(117,64,57,0.22)_0%,transparent_70%)] pointer-events-none blur-3xl -z-10" />
+      <div className="fixed top-0 left-1/4 w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(213,187,151,0.45)_0%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(117,64,57,0.22)_0%,transparent_70%)] pointer-events-none blur-3xl -z-10" />
       <div className="fixed bottom-10 right-1/4 w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,rgba(161,117,91,0.30)_0%,transparent_70%)] dark:bg-[radial-gradient(circle,rgba(140,85,60,0.18)_0%,transparent_70%)] pointer-events-none blur-3xl -z-10" />
 
       {/* MOBILE SIDEBAR WRAPPER */}
@@ -131,7 +131,7 @@ const Layout = ({ children }) => {
       >
         <div className="flex-1 flex flex-col min-h-0">
           {/* Logo Brand */}
-          <div className="flex items-center justify-between px-6 py-5 border-b border-[#D9CABB]/50 dark:border-[rgba(230,211,191,0.1)] shrink-0">
+          <div className="h-16 flex items-center justify-between px-6 border-b border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.12)] shrink-0">
             <Link to="/" className="flex items-center gap-2 group" onClick={() => setSidebarOpen(false)}>
               <img
                 src="/logo-dark.png"
@@ -211,15 +211,12 @@ const Layout = ({ children }) => {
             onClick={toggleTheme}
             id="sidebar-dark-mode-btn"
             className="flex items-center justify-between w-full px-3 py-2 rounded-xl text-xs font-bold text-[#77665A] dark:text-[#D1C1B0] hover:bg-[#E6DACC] dark:hover:bg-[#352920] hover:text-[#39251F] dark:hover:text-[#F6EEE3] transition-all cursor-pointer"
-            title={theme === 'dark' ? 'Switch to Light Mode (Alt+T)' : 'Switch to Dark Mode (Alt+T)'}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
             aria-label="Toggle Dark Mode"
           >
             <span className="flex items-center gap-2.5">
               {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-[#4A1917]" />}
               {theme === 'dark' ? 'Light Theme' : 'Dark Theme'}
-            </span>
-            <span className="text-[10px] bg-[#E6DACC] dark:bg-[#352920] text-[#77665A] dark:text-[#AA9886] px-1.5 py-0.5 rounded font-mono font-medium">
-              ALT+T
             </span>
           </button>
 
@@ -242,7 +239,7 @@ const Layout = ({ children }) => {
       {/* CONTENT AREA WRAPPER */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* HEADER */}
-        <header className="sticky top-0 z-30 h-16 bg-[rgba(251,247,240,0.75)] dark:bg-[rgba(43,33,27,0.78)] backdrop-blur-2xl border-b border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.12)] flex items-center justify-between px-6 shadow-xs transition-colors">
+        <header className="sticky top-0 z-30 h-16 bg-[rgba(251,247,240,0.85)] dark:bg-[rgba(33,23,20,0.88)] backdrop-blur-2xl border-b border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.12)] flex items-center justify-between px-6 shadow-xs transition-colors">
           <div className="flex items-center gap-4 flex-1">
             <button
               className="lg:hidden p-1.5 text-[#77665A] hover:bg-[#E6DACC] dark:hover:bg-[#352920] rounded-xl"
@@ -258,14 +255,9 @@ const Layout = ({ children }) => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search properties, tenants, leases, invoices..."
-              className="w-full pl-9 pr-14 py-2 text-xs rounded-full glass-input font-medium"
+              className="w-full pl-9 pr-4 py-2 text-xs rounded-full glass-input font-medium"
             />
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#78685D]" />
-            <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pointer-events-none">
-              <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-[#78685D] bg-[#E9DFD0] dark:bg-[#2F1F1B] border border-[#D9CBBB] dark:border-[#3E2A24] rounded-full shadow-xs">
-                Ctrl K
-              </kbd>
-            </div>
           </form>
       </div>
 
@@ -381,11 +373,11 @@ const Layout = ({ children }) => {
       </div>
     </header>
 
-        {/* PAGE BODY */ }
-  <main className="flex-1 px-4 sm:px-8 py-8 relative">
-    {children}
-  </main>
-      </div >
+        {/* PAGE BODY */}
+        <main className="flex-1 px-4 sm:px-8 py-6 relative">
+          {children}
+        </main>
+      </div>
     </div >
   );
 };

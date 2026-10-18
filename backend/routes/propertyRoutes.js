@@ -13,15 +13,21 @@ const {
   uploadPropertyMedia,
   deletePropertyMedia,
   setCoverPhoto,
-  reorderPropertyMedia
+  reorderPropertyMedia,
+  geocodeAddress,
+  reverseGeocodeCoordinates
 } = require('../controllers/propertyController');
 
 router.route('/')
   .post(protect, authorize('owner'), upload.array('images', 10), addProperty)
-  .get(protect, authorize('owner'), getProperties);
+  .get(protect, getProperties);
 
 router.get('/my', protect, getMyProperty);
 router.get('/me', protect, getMyProperty);
+
+// Geocoding Proxy Routes
+router.get('/geocode', protect, geocodeAddress);
+router.get('/reverse-geocode', protect, reverseGeocodeCoordinates);
 
 // Property Media Management Routes
 router.route('/:id/media')

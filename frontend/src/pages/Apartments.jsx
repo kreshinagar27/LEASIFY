@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import apiClient from '../services/api';
+import MapComponent from '../components/MapComponent';
 import { 
   Plus, Building, Edit, Trash2, Eye, Search, 
   Layers, CheckCircle2, AlertCircle, Home, Key,
-  X, Check, DollarSign, Shield, ArrowUpRight
+  X, Check, DollarSign, Shield, ArrowUpRight, MapPin
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -24,6 +25,19 @@ const Apartments = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterProperty, setFilterProperty] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+
+  // Map & Address state for apartment building
+  const [aptLat, setAptLat] = useState(12.9716);
+  const [aptLng, setAptLng] = useState(77.5946);
+  const [buildingAddress, setBuildingAddress] = useState({
+    houseNumber: '',
+    street: '',
+    area: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: 'India'
+  });
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm({
     defaultValues: {
@@ -79,8 +93,34 @@ const Apartments = () => {
     fetchData();
   }, []);
 
+  const propWatch = watch('propertyId');
+
+  // Sync building address & coordinates when property selection changes
+  useEffect(() => {
+    if (propWatch && properties.length > 0) {
+      const selectedProp = properties.find(p => p._id === propWatch);
+      if (selectedProp) {
+        const coords = selectedProp.location?.coordinates;
+        if (Array.isArray(coords) && coords.length >= 2 && !isNaN(coords[1]) && !isNaN(coords[0]) && (coords[0] !== 0 || coords[1] !== 0)) {
+          setAptLat(Number(coords[1]));
+          setAptLng(Number(coords[0]));
+        }
+        setBuildingAddress({
+          houseNumber: selectedProp.address?.houseNumber || '',
+          street: selectedProp.address?.street || '',
+          area: selectedProp.address?.area || '',
+          city: selectedProp.address?.city || '',
+          state: selectedProp.address?.state || '',
+          pincode: selectedProp.address?.pincode || '',
+          country: selectedProp.address?.country || 'India'
+        });
+      }
+    }
+  }, [propWatch, properties]);
+
   const openAddModal = () => {
     setEditingApartment(null);
+    const firstProp = properties.length > 0 ? properties[0] : null;
     reset({
       number: '',
       floor: 1,
@@ -93,14 +133,37 @@ const Apartments = () => {
       bathrooms: 2,
       balcony: true,
       parkingAvailable: true,
-      propertyId: properties.length > 0 ? properties[0]._id : ''
+      propertyId: firstProp ? firstProp._id : ''
     });
+
+    const coords = firstProp?.location?.coordinates;
+    if (Array.isArray(coords) && coords.length >= 2 && !isNaN(coords[1]) && !isNaN(coords[0]) && (coords[0] !== 0 || coords[1] !== 0)) {
+      setAptLat(Number(coords[1]));
+      setAptLng(Number(coords[0]));
+    } else {
+      setAptLat(12.9716);
+      setAptLng(77.5946);
+    }
+
+    setBuildingAddress({
+      houseNumber: firstProp?.address?.houseNumber || '',
+      street: firstProp?.address?.street || '',
+      area: firstProp?.address?.area || '',
+      city: firstProp?.address?.city || '',
+      state: firstProp?.address?.state || '',
+      pincode: firstProp?.address?.pincode || '',
+      country: firstProp?.address?.country || 'India'
+    });
+
     setActiveTab('basic');
     setModalOpen(true);
   };
 
   const openEditModal = (apt) => {
     setEditingApartment(apt);
+    const propId = apt.property?._id || apt.property || (properties.length > 0 ? properties[0]._id : '');
+    const matchedProp = properties.find(p => p._id === propId) || apt.property;
+
     reset({
       number: apt.number || '',
       floor: apt.floor ?? 1,
@@ -113,8 +176,28 @@ const Apartments = () => {
       bathrooms: apt.bathrooms ?? 0,
       balcony: apt.balcony ?? false,
       parkingAvailable: apt.parkingAvailable ?? false,
-      propertyId: apt.property?._id || apt.property || (properties.length > 0 ? properties[0]._id : '')
+      propertyId: propId
     });
+
+    const coords = matchedProp?.location?.coordinates;
+    if (Array.isArray(coords) && coords.length >= 2 && !isNaN(coords[1]) && !isNaN(coords[0]) && (coords[0] !== 0 || coords[1] !== 0)) {
+      setAptLat(Number(coords[1]));
+      setAptLng(Number(coords[0]));
+    } else {
+      setAptLat(12.9716);
+      setAptLng(77.5946);
+    }
+
+    setBuildingAddress({
+      houseNumber: matchedProp?.address?.houseNumber || '',
+      street: matchedProp?.address?.street || '',
+      area: matchedProp?.address?.area || '',
+      city: matchedProp?.address?.city || '',
+      state: matchedProp?.address?.state || '',
+      pincode: matchedProp?.address?.pincode || '',
+      country: matchedProp?.address?.country || 'India'
+    });
+
     setActiveTab('basic');
     setModalOpen(true);
   };
@@ -122,6 +205,7 @@ const Apartments = () => {
   const onSubmit = async (formData) => {
     setIsSubmitting(true);
     try {
+      const targetPropId = formData.propertyId || (properties.length > 0 ? properties[0]._id : undefined);
       const payload = {
         number: formData.number,
         floor: Number(formData.floor),
@@ -134,13 +218,28 @@ const Apartments = () => {
         bathrooms: Number(formData.bathrooms) || 0,
         balcony: Boolean(formData.balcony),
         parkingAvailable: Boolean(formData.parkingAvailable),
-        propertyId: formData.propertyId || (properties.length > 0 ? properties[0]._id : undefined)
+        propertyId: targetPropId,
+        latitude: aptLat,
+        longitude: aptLng,
+        address: buildingAddress
       };
+
+      if (targetPropId) {
+        try {
+          await apiClient.put(`/properties/${targetPropId}`, {
+            address: buildingAddress,
+            latitude: aptLat,
+            longitude: aptLng
+          });
+        } catch (syncErr) {
+          console.warn('Property location sync notice:', syncErr);
+        }
+      }
 
       if (editingApartment) {
         const res = await apiClient.put(`/apartments/${editingApartment._id}`, payload);
         if (res.data.success) {
-          toast.success('Apartment updated successfully!');
+          toast.success('Apartment and map address updated successfully!');
           setModalOpen(false);
           setEditingApartment(null);
           fetchData();
@@ -426,6 +525,16 @@ const Apartments = () => {
                     <Eye className="w-3.5 h-3.5" /> Details
                   </button>
                   <button
+                    onClick={() => {
+                      openEditModal(ap);
+                      setActiveTab('location');
+                    }}
+                    className="p-1.5 rounded-xl bg-cream-200/70 dark:bg-espresso-800 text-espresso dark:text-cream-200 hover:text-white hover:bg-brand-500 transition-colors"
+                    title="Edit Map Address & Location"
+                  >
+                    <MapPin className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => openEditModal(ap)}
                     className="p-1.5 rounded-xl bg-cream-200/70 dark:bg-espresso-800 text-espresso dark:text-cream-200 hover:text-white hover:bg-brand-500 transition-colors"
                     title="Edit Unit"
@@ -494,7 +603,16 @@ const Apartments = () => {
                   activeTab === 'specs' ? 'bg-brand-500 text-white shadow-md' : 'text-cream-600 dark:text-cream-400 hover:text-espresso'
                 }`}
               >
-                Specifications & Features
+                Specifications
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('location')}
+                className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
+                  activeTab === 'location' ? 'bg-brand-500 text-white shadow-md' : 'text-cream-600 dark:text-cream-400 hover:text-espresso'
+                }`}
+              >
+                Location & Map
               </button>
             </div>
 
@@ -667,6 +785,115 @@ const Apartments = () => {
                 </div>
               )}
 
+              {activeTab === 'location' && (
+                <div className="space-y-4 animate-in fade-in duration-150">
+                  <div className="p-3 bg-brand-500/10 border border-brand-500/20 rounded-2xl flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-espresso dark:text-cream-100 flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-brand-500" />
+                        Building Address & Map Pin
+                      </p>
+                      <p className="text-[11px] text-cream-600 dark:text-cream-400">
+                        Adjust the apartment building's physical address or click/drag the pin on the map.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-espresso dark:text-cream-200 mb-1">House / Building #</label>
+                      <input
+                        type="text"
+                        value={buildingAddress.houseNumber}
+                        onChange={(e) => setBuildingAddress(prev => ({ ...prev, houseNumber: e.target.value }))}
+                        className="w-full px-3 py-2 text-xs rounded-xl glass-input"
+                        placeholder="e.g. Tower B, Plot 14"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-espresso dark:text-cream-200 mb-1">Street Address</label>
+                      <input
+                        type="text"
+                        value={buildingAddress.street}
+                        onChange={(e) => setBuildingAddress(prev => ({ ...prev, street: e.target.value }))}
+                        className="w-full px-3 py-2 text-xs rounded-xl glass-input"
+                        placeholder="e.g. 5th Main Road"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-espresso dark:text-cream-200 mb-1">Area / Locality</label>
+                      <input
+                        type="text"
+                        value={buildingAddress.area}
+                        onChange={(e) => setBuildingAddress(prev => ({ ...prev, area: e.target.value }))}
+                        className="w-full px-3 py-2 text-xs rounded-xl glass-input"
+                        placeholder="e.g. Indiranagar"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-espresso dark:text-cream-200 mb-1">City</label>
+                      <input
+                        type="text"
+                        value={buildingAddress.city}
+                        onChange={(e) => setBuildingAddress(prev => ({ ...prev, city: e.target.value }))}
+                        className="w-full px-3 py-2 text-xs rounded-xl glass-input"
+                        placeholder="e.g. Bengaluru"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-espresso dark:text-cream-200 mb-1">State</label>
+                      <input
+                        type="text"
+                        value={buildingAddress.state}
+                        onChange={(e) => setBuildingAddress(prev => ({ ...prev, state: e.target.value }))}
+                        className="w-full px-3 py-2 text-xs rounded-xl glass-input"
+                        placeholder="e.g. Karnataka"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-espresso dark:text-cream-200 mb-1">Pincode</label>
+                      <input
+                        type="text"
+                        value={buildingAddress.pincode}
+                        onChange={(e) => setBuildingAddress(prev => ({ ...prev, pincode: e.target.value }))}
+                        className="w-full px-3 py-2 text-xs rounded-xl glass-input"
+                        placeholder="e.g. 560038"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-espresso dark:text-cream-200 mb-1">Country</label>
+                      <input
+                        type="text"
+                        value={buildingAddress.country}
+                        onChange={(e) => setBuildingAddress(prev => ({ ...prev, country: e.target.value }))}
+                        className="w-full px-3 py-2 text-xs rounded-xl glass-input"
+                        placeholder="India"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <label className="block text-xs font-bold text-espresso dark:text-cream-200 mb-1.5">
+                      Interactive Map Pin Location:
+                    </label>
+                    <MapComponent
+                      latitude={aptLat}
+                      longitude={aptLng}
+                      onLocationSelect={(newLat, newLng) => {
+                        setAptLat(newLat);
+                        setAptLng(newLng);
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="flex justify-end items-center gap-3 pt-4 border-t border-cream-200 dark:border-espresso-800">
                 <button
@@ -754,6 +981,35 @@ const Apartments = () => {
                   <span className="font-semibold text-espresso dark:text-cream-100">{viewingApartment.parkingAvailable ? 'Yes' : 'No'}</span>
                 </div>
               </div>
+
+              {/* Building Location Map */}
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-espresso dark:text-cream-200 uppercase text-[11px] tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-brand-500" /> Building Location & Map
+                  </h4>
+                  <span className="text-[10px] text-cream-600 dark:text-cream-400 truncate max-w-[220px]">
+                    {[
+                      viewingApartment.property?.address?.houseNumber,
+                      viewingApartment.property?.address?.street,
+                      viewingApartment.property?.address?.area,
+                      viewingApartment.property?.address?.city
+                    ].filter(Boolean).join(', ') || 'Address on file'}
+                  </span>
+                </div>
+                <div className="rounded-2xl overflow-hidden border border-cream-200 dark:border-espresso-800">
+                  <MapComponent
+                    latitude={viewingApartment.property?.location?.coordinates?.[1] || 12.9716}
+                    longitude={viewingApartment.property?.location?.coordinates?.[0] || 77.5946}
+                    readOnly={true}
+                    addressString={[
+                      viewingApartment.property?.name,
+                      viewingApartment.property?.address?.area,
+                      viewingApartment.property?.address?.city
+                    ].filter(Boolean).join(', ')}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-2">
@@ -762,8 +1018,19 @@ const Apartments = () => {
                   const toEdit = viewingApartment;
                   setViewingApartment(null);
                   openEditModal(toEdit);
+                  setActiveTab('location');
                 }}
                 className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-lg shadow-brand-500/20"
+              >
+                <MapPin className="w-3.5 h-3.5" /> Edit Map Address
+              </button>
+              <button
+                onClick={() => {
+                  const toEdit = viewingApartment;
+                  setViewingApartment(null);
+                  openEditModal(toEdit);
+                }}
+                className="px-4 py-2 bg-cream-200 hover:bg-cream-300 dark:bg-espresso-800 dark:hover:bg-espresso-700 text-espresso dark:text-cream-100 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors"
               >
                 <Edit className="w-3.5 h-3.5" /> Edit Unit
               </button>
