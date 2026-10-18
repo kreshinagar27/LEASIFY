@@ -7,25 +7,31 @@ const Maintenance = require('../models/Maintenance');
 const Notification = require('../models/Notification');
 const logActivity = require('../utils/activityLogger');
 const { sendTenantWelcomeEmail } = require('../utils/emailService');
-const { uploadToStorage, deleteFromStorage } = require('../utils/uploader');
+const { sendSMS } = require('../utils/smsService');
+const { uploadToStorage } = require('../utils/uploader');
 
 // Helper to generate a random temporary password
 const generateTempPassword = () => {
   return 'Leasify@' + Math.floor(100000 + Math.random() * 900000);
 };
 
-// @desc    Add Tenant & Onboard (Trigger Move-In)
+// @desc    Add Tenant & Onboard
 // @route   POST /api/v1/tenants
 // @access  Private (Owner Only)
 exports.addTenant = async (req, res, next) => {
   try {
     const {
-      name, email, phone, occupation, aadhaarNumber, panNumber,
+      name, email, phone, password, tempPassword: customTempPassword,
+      gender, unitNumber, occupation, aadhaarNumber, panNumber,
       emergencyName, emergencyPhone, emergencyRelation,
       propertyAssigned, monthlyRent, securityDeposit,
       leaseStartDate, leaseEndDate,
       electricityReading, waterReading, depositCollected, keyHandoverConfirmed
     } = req.body;
+
+    if (!name || !email || !phone) {
+      return res.status(400).json({ success: false, message: 'Name, email, and phone are required.' });
+    }
 
     // Check if email already exists
     const emailExists = await Tenant.findOne({ email });
@@ -33,38 +39,38 @@ exports.addTenant = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Email already registered as a tenant' });
     }
 
-    // Verify property exists and is vacant
-    const property = await Property.findById(propertyAssigned);
-    if (!property) {
-      return res.status(404).json({ success: false, message: 'Property not found' });
-    }
-    if (property.status !== 'Vacant' && property.status !== 'Reserved') {
-      return res.status(400).json({ success: false, message: `Property is currently ${property.status}` });
-    }
+    // Determine password
+    const finalPassword = password || customTempPassword || generateTempPassword();
 
-    // Generate temp password
-    const tempPassword = generateTempPassword();
+    let property = null;
+    if (propertyAssigned && mongoose.Types.ObjectId.isValid(propertyAssigned)) {
+      property = await Property.findById(propertyAssigned);
+    }
 
     // Create Tenant
     const tenant = await Tenant.create({
       name,
       email,
-      password: tempPassword,
+      password: finalPassword,
       phone,
-      occupation,
-      aadhaarNumber,
-      panNumber,
+      gender: gender || 'Unspecified',
+      unitNumber: unitNumber || '',
+      occupation: occupation || '',
+      aadhaarNumber: aadhaarNumber || ('Aadhaar-' + Math.floor(100000000000 + Math.random() * 900000000000)),
+      panNumber: panNumber || '',
       emergencyContact: {
         name: emergencyName || '',
         phone: emergencyPhone || '',
         relationship: emergencyRelation || ''
       },
       owner: req.user.id,
-      propertyAssigned,
-      monthlyRent,
-      securityDeposit,
-      leaseStartDate,
-      leaseEndDate,
+      propertyAssigned: property ? property._id : null,
+      monthlyRent: parseFloat(monthlyRent) || (property ? property.monthlyRent : 0),
+      securityDeposit: parseFloat(securityDeposit) || (property ? property.securityDeposit : 0),
+      leaseStartDate: leaseStartDate ? new Date(leaseStartDate) : new Date(),
+      leaseEndDate: leaseEndDate ? new Date(leaseEndDate) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      verified: true,
+      isActive: true,
       moveInDetails: {
         meterReadings: {
           electricity: parseFloat(electricityReading) || 0,
@@ -75,45 +81,50 @@ exports.addTenant = async (req, res, next) => {
       }
     });
 
-    // Update Property Status
-    property.status = 'Occupied';
-    property.tenant = tenant._id;
-    await property.save();
+    // Update Property Status if assigned
+    if (property) {
+      property.status = 'Occupied';
+      property.tenant = tenant._id;
+      await property.save();
+    }
 
     // Send Welcome Email
     try {
-      await sendTenantWelcomeEmail(tenant, tempPassword);
+      await sendTenantWelcomeEmail(tenant, finalPassword);
     } catch (err) {
-      console.error('Welcome email failed to send:', err.message);
+      console.error('Welcome email notification note:', err.message);
+    }
+    // Send SMS with temporary password
+    try {
+      await sendSMS(tenant.phone, `Your temporary password is: ${finalPassword}`);
+    } catch (err) {
+      console.error('SMS sending error:', err.message);
     }
 
-    // In-App Notification
-    await Notification.create({
-      user: tenant._id,
-      userModel: 'Tenant',
-      title: 'Welcome to Leasify!',
-      message: `Your account has been created by your landlord. Your assigned property is ${property.name}.`,
-      category: 'system'
-    });
-
-    await logActivity(req.user.id, 'Owner', 'Tenant Added', `Tenant '${tenant.name}' was assigned to Property '${property.name}'.`, req);
+    await logActivity(
+      req.user.id,
+      'Owner',
+      'Tenant Added',
+      `Tenant '${tenant.name}' was created and assigned to ${property ? property.name : 'No Property'}.`,
+      req
+    );
 
     res.status(201).json({
       success: true,
       data: tenant,
-      tempPassword // Send back so owner can copy it manually if email fails
+      tempPassword: finalPassword
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Get All Tenants
+// @desc    Get All Tenants for Owner
 // @route   GET /api/v1/tenants
 // @access  Private (Owner Only)
 exports.getTenants = async (req, res, next) => {
   try {
-    const tenants = await Tenant.find({ owner: req.user.id }).populate('propertyAssigned', 'name address');
+    const tenants = await Tenant.find({ owner: req.user.id }).populate('propertyAssigned', 'name address status');
     res.status(200).json({
       success: true,
       count: tenants.length,
@@ -139,34 +150,16 @@ exports.getTenant = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Tenant not found' });
     }
 
-    // Auth validation
-    if (req.userRole === 'owner' && tenant.owner.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'Not authorized to view this tenant' });
-    }
-    if (req.userRole === 'tenant' && tenant._id.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'Not authorized to view this profile' });
-    }
-
-    // Fetch related records
-    const bills = await Bill.find({ tenant: tenant._id }).sort({ createdAt: -1 });
-    const payments = await Payment.find({ tenant: tenant._id }).sort({ createdAt: -1 });
-    const complaints = await Maintenance.find({ tenant: tenant._id }).sort({ createdAt: -1 });
-
     res.status(200).json({
       success: true,
-      data: tenant,
-      history: {
-        bills,
-        payments,
-        complaints
-      }
+      data: tenant
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Update Tenant profile details
+// @desc    Update Tenant Details
 // @route   PUT /api/v1/tenants/:id
 // @access  Private (Owner Only)
 exports.updateTenant = async (req, res, next) => {
@@ -186,30 +179,135 @@ exports.updateTenant = async (req, res, next) => {
     }
 
     const {
-      name, phone, occupation, panNumber, emergencyName, emergencyPhone, emergencyRelation
+      name, email, phone, gender, unitNumber, occupation, panNumber, aadhaarNumber,
+      monthlyRent, securityDeposit, leaseStartDate, leaseEndDate,
+      emergencyName, emergencyPhone, emergencyRelation, propertyAssigned, isActive
     } = req.body;
 
-    const updateData = {
-      name: name || tenant.name,
-      phone: phone || tenant.phone,
-      occupation: occupation || tenant.occupation,
-      panNumber: panNumber || tenant.panNumber,
-      emergencyContact: {
-        name: emergencyName || tenant.emergencyContact.name,
-        phone: emergencyPhone || tenant.emergencyContact.phone,
-        relationship: emergencyRelation || tenant.emergencyContact.relationship
-      }
-    };
+    if (name) tenant.name = name;
+    if (email) tenant.email = email;
+    if (phone) tenant.phone = phone;
+    if (gender) tenant.gender = gender;
+    if (unitNumber !== undefined) tenant.unitNumber = unitNumber;
+    if (occupation !== undefined) tenant.occupation = occupation;
+    if (panNumber !== undefined) tenant.panNumber = panNumber;
+    if (aadhaarNumber !== undefined) tenant.aadhaarNumber = aadhaarNumber;
+    if (monthlyRent !== undefined) tenant.monthlyRent = parseFloat(monthlyRent);
+    if (securityDeposit !== undefined) tenant.securityDeposit = parseFloat(securityDeposit);
+    if (leaseStartDate) tenant.leaseStartDate = new Date(leaseStartDate);
+    if (leaseEndDate) tenant.leaseEndDate = new Date(leaseEndDate);
+    if (isActive !== undefined) tenant.isActive = isActive === 'true' || isActive === true;
 
-    tenant = await Tenant.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-      runValidators: true
-    });
+    if (emergencyName !== undefined || emergencyPhone !== undefined || emergencyRelation !== undefined) {
+      tenant.emergencyContact = {
+        name: emergencyName !== undefined ? emergencyName : (tenant.emergencyContact ? tenant.emergencyContact.name : ''),
+        phone: emergencyPhone !== undefined ? emergencyPhone : (tenant.emergencyContact ? tenant.emergencyContact.phone : ''),
+        relationship: emergencyRelation !== undefined ? emergencyRelation : (tenant.emergencyContact ? tenant.emergencyContact.relationship : '')
+      };
+    }
+
+    // Property assignment changes
+    if (propertyAssigned !== undefined) {
+      const oldPropertyId = tenant.propertyAssigned ? tenant.propertyAssigned.toString() : null;
+      const newPropertyId = propertyAssigned && mongoose.Types.ObjectId.isValid(propertyAssigned) ? propertyAssigned : null;
+
+      if (oldPropertyId !== newPropertyId) {
+        if (oldPropertyId) {
+          const oldProp = await Property.findById(oldPropertyId);
+          if (oldProp) {
+            oldProp.status = 'Vacant';
+            oldProp.tenant = null;
+            await oldProp.save();
+          }
+        }
+        if (newPropertyId) {
+          const newProp = await Property.findById(newPropertyId);
+          if (newProp) {
+            newProp.status = 'Occupied';
+            newProp.tenant = tenant._id;
+            await newProp.save();
+          }
+        }
+        tenant.propertyAssigned = newPropertyId;
+      }
+    }
+
+    await tenant.save();
 
     await logActivity(req.user.id, 'Owner', 'Tenant Updated', `Tenant details for '${tenant.name}' were updated.`, req);
 
+    const updatedTenant = await Tenant.findById(tenant._id).populate('propertyAssigned', 'name address status');
+
     res.status(200).json({
       success: true,
+      data: updatedTenant
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset Tenant Password (Owner Only)
+// @route   PUT /api/v1/tenants/:id/reset-password
+// @access  Private (Owner Only)
+exports.resetTenantPassword = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Tenant ID' });
+    }
+
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
+    }
+
+    const tenant = await Tenant.findById(req.params.id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    if (tenant.owner.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    tenant.password = newPassword;
+    await tenant.save();
+
+    await logActivity(req.user.id, 'Owner', 'Tenant Password Reset', `Owner reset password for Tenant '${tenant.name}'.`, req);
+
+    res.status(200).json({
+      success: true,
+      message: `Password for Tenant '${tenant.name}' updated successfully.`
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Toggle Tenant Active Status
+// @route   PUT /api/v1/tenants/:id/toggle-status
+// @access  Private (Owner Only)
+exports.toggleTenantStatus = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid Tenant ID' });
+    }
+
+    const tenant = await Tenant.findById(req.params.id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    if (tenant.owner.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+
+    tenant.isActive = !tenant.isActive;
+    await tenant.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Tenant status changed to ${tenant.isActive ? 'Active' : 'Inactive'}`,
       data: tenant
     });
   } catch (error) {
@@ -237,7 +335,6 @@ exports.renewLease = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    // Store history of renewal
     tenant.leaseRenewals.push({
       startDate: tenant.leaseStartDate,
       endDate: tenant.leaseEndDate,
@@ -248,22 +345,12 @@ exports.renewLease = async (req, res, next) => {
     tenant.leaseEndDate = leaseEndDate;
     if (monthlyRent) {
       tenant.monthlyRent = monthlyRent;
-      // Also update monthly rent on property if assigned
       if (tenant.propertyAssigned) {
         await Property.findByIdAndUpdate(tenant.propertyAssigned, { monthlyRent });
       }
     }
 
     await tenant.save();
-
-    // Create Notification
-    await Notification.create({
-      user: tenant._id,
-      userModel: 'Tenant',
-      title: 'Lease Agreement Renewed',
-      message: `Your lease has been renewed until ${new Date(leaseEndDate).toLocaleDateString()}. New rent: INR ${tenant.monthlyRent}.`,
-      category: 'lease'
-    });
 
     await logActivity(req.user.id, 'Owner', 'Lease Renewed', `Lease for Tenant '${tenant.name}' was renewed.`, req);
 
@@ -305,7 +392,6 @@ exports.moveOutTenant = async (req, res, next) => {
 
     const propertyId = tenant.propertyAssigned;
 
-    // Save Move Out Records
     tenant.moveOutDetails = {
       meterReadings: {
         electricity: parseFloat(electricityReading) || 0,
@@ -321,26 +407,18 @@ exports.moveOutTenant = async (req, res, next) => {
     tenant.isActive = false;
     await tenant.save();
 
-    // Update Property to Vacant
-    await Property.findByIdAndUpdate(propertyId, {
-      status: 'Vacant',
-      tenant: null
-    });
+    const property = await Property.findById(propertyId);
+    if (property) {
+      property.status = 'Vacant';
+      property.tenant = null;
+      await property.save();
+    }
 
-    // Create Notification
-    await Notification.create({
-      user: tenant._id,
-      userModel: 'Tenant',
-      title: 'Move-Out Settled',
-      message: 'Your lease has been ended. Your security deposit settlement is complete.',
-      category: 'lease'
-    });
-
-    await logActivity(req.user.id, 'Owner', 'Tenant Move-Out', `Tenant '${tenant.name}' has moved out. Property marked Vacant.`, req);
+    await logActivity(req.user.id, 'Owner', 'Move-Out Processed', `Move-out processed for Tenant '${tenant.name}'.`, req);
 
     res.status(200).json({
       success: true,
-      message: 'Move-Out workflow completed. Property is now vacant.'
+      message: 'Move-out workflow processed successfully.'
     });
   } catch (error) {
     next(error);
@@ -363,7 +441,6 @@ exports.uploadDocument = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Tenant not found' });
     }
 
-    // Role authentication
     if (req.userRole === 'owner' && tenant.owner.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
@@ -384,7 +461,6 @@ exports.uploadDocument = async (req, res, next) => {
       publicId: uploadResult.publicId
     });
 
-    // If fileType is 'Lease', also update main leaseAgreementUrl
     if (fileType === 'Lease') {
       tenant.leaseAgreementUrl = uploadResult.url;
     }
@@ -408,7 +484,7 @@ exports.uploadDocument = async (req, res, next) => {
   }
 };
 
-// @desc    Deactivate/Delete Tenant
+// @desc    Deactivate or Delete Tenant
 // @route   DELETE /api/v1/tenants/:id
 // @access  Private (Owner Only)
 exports.deactivateTenant = async (req, res, next) => {
@@ -427,15 +503,36 @@ exports.deactivateTenant = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    // If tenant is assigned to property, force move out first
-    if (tenant.propertyAssigned) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete/deactivate tenant who is currently assigned to a property. Please complete the Move-Out workflow first.'
+    const forceDelete = req.query.force === 'true' || req.query.permanent === 'true' || req.body.force === true;
+
+    if (forceDelete) {
+      if (tenant.propertyAssigned) {
+        const prop = await Property.findById(tenant.propertyAssigned);
+        if (prop) {
+          prop.status = 'Vacant';
+          prop.tenant = null;
+          await prop.save();
+        }
+      }
+      await Tenant.findByIdAndDelete(req.params.id);
+      await logActivity(req.user.id, 'Owner', 'Tenant Deleted', `Tenant '${tenant.name}' was permanently deleted.`, req);
+      return res.status(200).json({
+        success: true,
+        message: 'Tenant permanently deleted from database.'
       });
     }
 
     // Soft delete / deactivate
+    if (tenant.propertyAssigned) {
+      const prop = await Property.findById(tenant.propertyAssigned);
+      if (prop) {
+        prop.status = 'Vacant';
+        prop.tenant = null;
+        await prop.save();
+      }
+      tenant.propertyAssigned = null;
+    }
+
     tenant.isActive = false;
     await tenant.save();
 

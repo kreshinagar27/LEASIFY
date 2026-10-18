@@ -15,6 +15,7 @@ const swaggerDocument = require('./swagger.json');
 const authRoutes = require('./routes/authRoutes');
 const propertyRoutes = require('./routes/propertyRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
+const apartmentRoutes = require('./routes/apartmentRoutes');
 const billRoutes = require('./routes/billRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const maintenanceRoutes = require('./routes/maintenanceRoutes');

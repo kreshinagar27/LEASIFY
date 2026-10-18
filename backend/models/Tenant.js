@@ -28,9 +28,18 @@ const TenantSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  gender: {
+    type: String,
+    enum: ['Male', 'Female', 'Other', 'Unspecified'],
+    default: 'Unspecified'
+  },
+  unitNumber: {
+    type: String,
+    default: ''
+  },
   aadhaarNumber: {
     type: String,
-    required: [true, 'Please add Aadhaar number']
+    default: ''
   },
   panNumber: {
     type: String,

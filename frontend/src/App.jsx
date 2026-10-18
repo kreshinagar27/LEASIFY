@@ -11,7 +11,7 @@ import ResetPassword from './pages/ResetPassword';
 import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import Properties from './pages/Properties';
-import PropertyDetail from './pages/PropertyDetail';
+import Apartments from './pages/Apartments';
 import Tenants from './pages/Tenants';
 import TenantDetail from './pages/TenantDetail';
 import Bills from './pages/Bills';
@@ -126,6 +126,14 @@ const App = () => {
           </ProtectedRoute>
         }
       />
+        <Route
+          path="/apartments"
+          element={
+            <ProtectedRoute allowedRoles={['owner']}>
+              <Apartments />
+            </ProtectedRoute>
+          }
+        />
 
       {/* Tenants Management */}
       <Route

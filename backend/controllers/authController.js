@@ -491,11 +491,9 @@ exports.changePassword = async (req, res, next) => {
 exports.deleteAccount = async (req, res, next) => {
   try {
     if (req.userRole === 'owner') {
-      // Clean up properties, tenants etc (Optional, but let's delete owner)
-      await Owner.findByIdAndDelete(req.user.id);
-      res.status(200).json({ success: true, message: 'Owner account deleted.' });
+      return res.status(403).json({ success: false, message: 'Primary Owner account is protected and cannot be deleted.' });
     } else {
-      res.status(400).json({ success: false, message: 'Tenants cannot delete their own account. Please contact your Landlord.' });
+      return res.status(400).json({ success: false, message: 'Tenants cannot delete their own account. Please contact your Landlord.' });
     }
   } catch (error) {
     next(error);

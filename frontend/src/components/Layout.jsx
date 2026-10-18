@@ -92,7 +92,7 @@ const Layout = ({ children }) => {
   const sidebarLinks = user?.role === 'owner' ? [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Properties', path: '/properties', icon: Building },
-    { name: 'Tenants', path: '/tenants', icon: Users },
+    { name: 'Apartments', path: '/apartments', icon: Building },
     { name: 'Invoices & Bills', path: '/bills', icon: FileText },
     { name: 'Payments Ledger', path: '/payments', icon: CreditCard },
     { name: 'Maintenance', path: '/maintenance', icon: Wrench },

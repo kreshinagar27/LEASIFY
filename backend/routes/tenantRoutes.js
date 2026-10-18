@@ -7,6 +7,8 @@ const {
   getTenants,
   getTenant,
   updateTenant,
+  resetTenantPassword,
+  toggleTenantStatus,
   renewLease,
   moveOutTenant,
   uploadDocument,
@@ -22,6 +24,8 @@ router.route('/:id')
   .put(protect, authorize('owner'), updateTenant)
   .delete(protect, authorize('owner'), deactivateTenant);
 
+router.put('/:id/reset-password', protect, authorize('owner'), resetTenantPassword);
+router.put('/:id/toggle-status', protect, authorize('owner'), toggleTenantStatus);
 router.put('/:id/renew', protect, authorize('owner'), renewLease);
 router.post('/:id/move-out', protect, authorize('owner'), moveOutTenant);
 router.post('/:id/documents', protect, upload.single('document'), uploadDocument);
