@@ -146,6 +146,8 @@ const TenantSchema = new mongoose.Schema({
       publicId: String
     }
   ],
+  resetPasswordToken: String,
+  resetPasswordExpire: Date,
   createdAt: {
     type: Date,
     default: Date.now

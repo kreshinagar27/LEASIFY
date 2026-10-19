@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import EntryAnimation from './components/EntryAnimation';
 
 // Import pages
 import Login from './pages/Login';
@@ -81,9 +82,11 @@ const GuestRoute = ({ children }) => {
 
 const App = () => {
   return (
-    <Routes>
-      {/* Public Landing & Guest Authentication Routes */}
-      <Route path="/" element={<HomeRoute />} />
+    <>
+      <EntryAnimation />
+      <Routes>
+        {/* Public Landing & Guest Authentication Routes */}
+        <Route path="/" element={<HomeRoute />} />
       <Route path="/landing" element={<Landing />} />
       <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
       <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
@@ -249,6 +252,7 @@ const App = () => {
       {/* Fallback routing */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 };
 

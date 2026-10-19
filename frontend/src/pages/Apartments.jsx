@@ -310,7 +310,8 @@ const Apartments = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <>
+      <div className="space-y-6 max-w-7xl mx-auto pb-12">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-cream-100 via-cream-200 to-cream-300 dark:from-espresso-900 dark:via-espresso-950 dark:to-espresso-900 p-6 rounded-[2rem] border border-cream-300 dark:border-espresso-800 shadow-md">
         <div>
@@ -554,6 +555,7 @@ const Apartments = () => {
           })}
         </div>
       )}
+    </div>
 
       {/* Add / Edit Apartment Modal */}
       {modalOpen && (
@@ -1067,7 +1069,7 @@ const Apartments = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

@@ -5,7 +5,7 @@ import apiClient, { API_URL } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   FileText, Plus, Search, Calendar, CreditCard,
-  Download, Eye, AlertTriangle, CheckCircle, Clock, X, QrCode
+  Download, Eye, AlertTriangle, CheckCircle, Clock, X, QrCode, Sparkles
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -19,6 +19,10 @@ const Bills = () => {
   // Selected bill for checkout payment
   const [selectedBill, setSelectedBill] = useState(null);
   const [upiRef, setUpiRef] = useState('');
+
+  // Demo Payment Simulation states
+  const [demoSimulating, setDemoSimulating] = useState(false);
+  const [demoFailReason, setDemoFailReason] = useState('Card Declined (Simulated)');
 
   // Dropdown options
   const [activeTenants, setActiveTenants] = useState([]);
@@ -156,6 +160,36 @@ const Bills = () => {
     }
   };
 
+  // Demo Payment Simulation handler
+  const handleDemoPayment = async (outcome) => {
+    if (!selectedBill || demoSimulating) return;
+    setDemoSimulating(true);
+    try {
+      const payload = {
+        billId: selectedBill._id,
+        simulateOutcome: outcome,
+        failureReason: outcome === 'failure' ? demoFailReason : undefined
+      };
+      const res = await apiClient.post('/payments/demo-simulate', payload);
+      if (res.data.success) {
+        toast.success(res.data.message || 'Demo payment simulated successfully! Rent marked as paid.');
+        setPayModalOpen(false);
+        fetchBills();
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Payment simulation failed.';
+      if (outcome === 'failure') {
+        toast.error(msg, { icon: '⚠️' });
+        setPayModalOpen(false);
+        fetchBills();
+      } else {
+        toast.error(msg);
+      }
+    } finally {
+      setDemoSimulating(false);
+    }
+  };
+
   // Manual UPI checkout submit
   const handleUpiSubmit = async (e) => {
     e.preventDefault();
@@ -210,7 +244,8 @@ const Bills = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-black text-[#38251F] dark:text-[#FAF7F1] Outfit">Invoices & Billings</h1>
@@ -362,6 +397,7 @@ const Bills = () => {
           </div>
         </div>
       )}
+    </div>
 
       {/* GENERATE BILL MODAL (OWNER) */}
       {modalOpen && (
@@ -515,12 +551,85 @@ const Bills = () => {
               </p>
             </div>
 
+            {/* Notice: Demo Mode requirement 14 */}
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl mb-4 text-xs">
+              <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-300 font-bold mb-0.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>Demo Payment Mode Active</span>
+              </div>
+              <p className="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">
+                Demo Mode: No real money will be transferred.
+              </p>
+            </div>
+
+            {/* DEMO SIMULATION OPTIONS */}
+            <div className="p-3.5 bg-[#FAF7F1] dark:bg-[#1E1715] border border-[#D9CBBB] dark:border-[#38251F] rounded-2xl mb-4 space-y-3 shadow-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-[#38251F] dark:text-[#FAF7F1] uppercase tracking-wider flex items-center gap-1">
+                  <CreditCard className="w-3.5 h-3.5 text-brand-600" />
+                  Simulate Rent Payment
+                </span>
+                <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 uppercase">
+                  Simulation
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  id="btn-demo-simulate-success"
+                  disabled={demoSimulating}
+                  onClick={() => handleDemoPayment('success')}
+                  className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Simulate successful payment"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{demoSimulating ? 'Processing...' : 'Simulate Success'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-demo-simulate-failure"
+                  disabled={demoSimulating}
+                  onClick={() => handleDemoPayment('failure')}
+                  className="py-2.5 px-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Simulate failed payment"
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>{demoSimulating ? 'Processing...' : 'Simulate Failure'}</span>
+                </button>
+              </div>
+
+              <div className="pt-1">
+                <label className="text-[10px] text-[#78685D] dark:text-[#C5B5A5] font-semibold block mb-1">
+                  Simulated Failure Reason (For Failure Test):
+                </label>
+                <select
+                  value={demoFailReason}
+                  onChange={(e) => setDemoFailReason(e.target.value)}
+                  className="w-full text-xs py-1.5 px-2.5 rounded-xl glass-input text-[#38251F] dark:text-[#FAF7F1] border border-[#D9CBBB] dark:border-[#38251F]"
+                >
+                  <option value="Card Declined (Simulated)">Simulated Card Declined</option>
+                  <option value="Insufficient Demo Funds">Insufficient Demo Funds</option>
+                  <option value="Bank Gateway Timeout (Simulated)">Bank Gateway Timeout</option>
+                  <option value="Daily Transaction Limit Exceeded (Simulated)">Daily Transaction Limit Exceeded</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Payment methods divider */}
+            <div className="relative flex py-1 items-center mb-4">
+              <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+              <span className="flex-shrink mx-3 text-[10px] text-slate-400 font-bold uppercase">Other Payment Options</span>
+              <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+            </div>
+
             {/* Payment methods */}
             <div className="space-y-4">
               {/* Option 1: Card / Razorpay Gateway */}
               <button
                 onClick={() => handleRazorpayCheckout(selectedBill)}
-                className="w-full py-3 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-center text-xs font-bold shadow-lg shadow-brand-500/20 transition-all flex items-center justify-center gap-1.5"
+                className="w-full py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl text-center text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 Pay via Card / Netbanking (Razorpay)
               </button>
@@ -568,7 +677,7 @@ const Bills = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

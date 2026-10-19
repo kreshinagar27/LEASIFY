@@ -75,7 +75,7 @@ const generateBillPDF = async (bill, tenant, property, payment = null) => {
           doc.fillColor('#4B5563').fontSize(10).text(item.name, 60, y);
           doc.text(item.val.toLocaleString('en-IN'), 450, y, { align: 'right' });
           y += 15;
-          doc.moveTo(50, y).lineTo(550, y).strokeColor('#F3F4F6').strokeWidth(0.5).stroke();
+          doc.lineWidth(0.5).strokeColor('#F3F4F6').moveTo(50, y).lineTo(550, y).stroke();
         }
       });
 
@@ -87,9 +87,10 @@ const generateBillPDF = async (bill, tenant, property, payment = null) => {
       // If Payment was processed, print transaction details
       if (payment) {
         y += 40;
-        doc.fillColor('#10B981').rect(50, y, 500, 50).fill();
-        doc.fillColor('#FFFFFF').fontSize(10).text('Transaction Successful Details', 60, y + 8, { underline: true });
-        doc.text(`Method: ${payment.paymentMethod}`, 60, y + 22);
+        const isDemo = payment.isDemo || payment.paymentMethod === 'Demo';
+        doc.fillColor(isDemo ? '#4A1917' : '#10B981').rect(50, y, 500, 50).fill();
+        doc.fillColor('#FFFFFF').fontSize(10).text(isDemo ? 'DEMO PAYMENT SIMULATION (No real money transferred)' : 'Transaction Successful Details', 60, y + 8, { underline: true });
+        doc.text(`Method: ${payment.paymentMethod}${isDemo ? ' (Demo Simulation)' : ''}`, 60, y + 22);
         doc.text(`Transaction ID: ${payment.transactionId}`, 60, y + 34);
         doc.text(`Paid Date: ${new Date(payment.paymentDate).toLocaleString()}`, 300, y + 22);
       }

@@ -3,6 +3,8 @@ import { useNavigate, Link, useLocation, useSearchParams } from 'react-router-do
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useForm } from 'react-hook-form';
+import toast from 'react-hot-toast';
+import apiClient from '../services/api';
 import {
   Lock,
   Mail,
@@ -31,10 +33,16 @@ const Login = () => {
   const [role, setRole] = useState(queryRole || stateRole || 'owner'); // 'owner' or 'tenant'
   const [rememberMe, setRememberMe] = useState(true);
 
+  const [previewAccounts, setPreviewAccounts] = useState({
+    owner: { email: 'dakshvashistha1369@gmail.com', role: 'owner', name: 'Property Owner' },
+    tenant: { email: 'kreshinagar27@gmail.com', role: 'tenant', name: 'Resident Tenant' }
+  });
+
   const {
     register,
     handleSubmit,
     setValue,
+    clearErrors,
     formState: { errors, isSubmitting }
   } = useForm({
     defaultValues: {
@@ -42,6 +50,23 @@ const Login = () => {
       password: ''
     }
   });
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient.get('/auth/preview-accounts')
+      .then(res => {
+        if (isMounted && res.data?.success && res.data.accounts) {
+          setPreviewAccounts(prev => ({
+            ...prev,
+            ...res.data.accounts
+          }));
+        }
+      })
+      .catch(() => {
+        // Safe silent fallback to defaults
+      });
+    return () => { isMounted = false; };
+  }, []);
 
   useEffect(() => {
     if (queryRole === 'tenant' || stateRole === 'tenant') {
@@ -62,13 +87,18 @@ const Login = () => {
 
   const fillDemoAccount = (demoRole) => {
     handleRoleChange(demoRole);
-    if (demoRole === 'owner') {
-      setValue('email', 'dakshvashistha1369@gmail.com');
-      setValue('password', 'Admin@123');
-    } else {
-      setValue('email', 'kreshinagar27@gmail.com');
-      setValue('password', 'kd@101227');
-    }
+    const targetEmail = previewAccounts[demoRole]?.email || (demoRole === 'owner' ? 'dakshvashistha1369@gmail.com' : 'kreshinagar27@gmail.com');
+    setValue('email', targetEmail, { shouldValidate: true });
+    // Securely clear any old password - do not prefill stale or plaintext credentials
+    setValue('password', '', { shouldValidate: false });
+    clearErrors('password');
+    toast.success(
+      `Selected ${demoRole === 'owner' ? 'Owner' : 'Tenant'} account (${targetEmail}). Please enter your password.`,
+      { id: 'quick-demo-toast', icon: '🔑' }
+    );
+    setTimeout(() => {
+      document.getElementById('login-password')?.focus();
+    }, 50);
   };
 
   const onSubmit = async (data) => {
@@ -85,7 +115,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between text-[#35231F] dark:text-[#F7EFE5] m-0 p-0 relative overflow-y-auto selection:bg-[#4B1715] selection:text-[#FAF7F0]">
+    <div className="min-h-screen w-full flex flex-col justify-between text-[#35231F] dark:text-[#F7EFE5] m-0 p-0 relative overflow-x-hidden overflow-y-auto selection:bg-[#4B1715] selection:text-[#FAF7F0]">
       {/* Background House Video/Animation */}
       <PropertyBackground fixed={true} overlayOpacity="dense" />
 
@@ -177,6 +207,7 @@ const Login = () => {
               type="button"
               id="quick-demo-owner"
               onClick={() => fillDemoAccount('owner')}
+              title={`Switch to Owner (${previewAccounts.owner.email})`}
               className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#FAF7F1] dark:bg-[#352920] text-[#39251F] dark:text-[#FAF7F1] hover:bg-[#4A1917] hover:text-white dark:hover:bg-[#754039] transition-all cursor-pointer border border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.1)]"
             >
               Owner
@@ -185,6 +216,7 @@ const Login = () => {
               type="button"
               id="quick-demo-tenant"
               onClick={() => fillDemoAccount('tenant')}
+              title={`Switch to Tenant (${previewAccounts.tenant.email})`}
               className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#FAF7F1] dark:bg-[#352920] text-[#39251F] dark:text-[#FAF7F1] hover:bg-[#4A1917] hover:text-white dark:hover:bg-[#754039] transition-all cursor-pointer border border-[#D9CABB]/60 dark:border-[rgba(230,211,191,0.1)]"
             >
               Tenant
@@ -228,12 +260,13 @@ const Login = () => {
               </Link>
             </div>
             <PasswordInput
-              register={register}
-              name="password"
-              rules={{ required: 'Password is required' }}
-              error={errors.password}
+              id="login-password"
               placeholder="••••••••••••"
+              {...register('password', { required: 'Password is required' })}
             />
+            {errors.password && (
+              <span className="text-[10px] text-red-500 mt-0.5 block">{errors.password.message}</span>
+            )}
           </div>
 
           <div className="flex items-center gap-2 pt-1">

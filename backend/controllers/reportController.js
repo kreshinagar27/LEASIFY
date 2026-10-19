@@ -290,7 +290,7 @@ exports.exportReportData = async (req, res, next) => {
           'Invoice Number': p.bill ? p.bill.invoiceNumber : 'N/A',
           'Rent Amount': p.bill ? p.bill.rent : 0,
           'Total Paid (INR)': p.amount,
-          'Payment Mode': p.paymentMethod
+          'Payment Mode': (p.isDemo || p.paymentMethod === 'Demo') ? 'Demo Simulation' : p.paymentMethod
         }));
         break;
 

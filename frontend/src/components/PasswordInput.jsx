@@ -8,6 +8,9 @@ import { Lock, Eye, EyeOff } from 'lucide-react';
 const PasswordInput = forwardRef(({
   id,
   name,
+  register: registerFn,
+  rules,
+  error,
   placeholder = '••••••••',
   className = '',
   containerClassName = '',
@@ -18,6 +21,10 @@ const PasswordInput = forwardRef(({
 }, ref) => {
   const [showPassword, setShowPassword] = useState(false);
 
+  const registeredProps = (typeof registerFn === 'function' && name)
+    ? registerFn(name, rules)
+    : {};
+
   const toggleVisibility = (e) => {
     e.preventDefault();
     setShowPassword((prev) => !prev);
@@ -26,13 +33,18 @@ const PasswordInput = forwardRef(({
   return (
     <div className={`relative flex items-center ${containerClassName}`}>
       <input
-        ref={ref}
+        ref={(node) => {
+          if (typeof ref === 'function') ref(node);
+          else if (ref) ref.current = node;
+          if (registeredProps.ref) registeredProps.ref(node);
+        }}
         id={id}
         name={name}
         type={showPassword ? 'text' : 'password'}
         placeholder={placeholder}
         aria-label={ariaLabel}
         className={`w-full ${showLeftIcon ? 'pl-10' : 'pl-3.5'} pr-10 py-2.5 rounded-2xl glass-input text-sm ${className}`}
+        {...registeredProps}
         {...rest}
       />
       {showLeftIcon && LeftIcon && (

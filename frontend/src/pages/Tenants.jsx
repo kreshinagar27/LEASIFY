@@ -354,7 +354,8 @@ const Tenants = () => {
   const unassignedCount = tenants.filter(t => !t.propertyAssigned).length;
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       {/* HEADER BAR */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -709,6 +710,7 @@ const Tenants = () => {
           ))}
         </div>
       )}
+    </div>
 
       {/* ======================================================== */}
       {/* 1. ADD TENANT MODAL (Section 6 Requirement) */}
@@ -1365,7 +1367,7 @@ const Tenants = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

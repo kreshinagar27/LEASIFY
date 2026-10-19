@@ -1,6 +1,2 @@
 LEASIFY-
-1) password change problem
-2) entry animation
-3) fix space 
-4) demo payment data ( don't change other data )
-5) favicon
+1) properties, apartments

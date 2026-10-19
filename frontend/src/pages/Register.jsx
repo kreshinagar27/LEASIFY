@@ -48,7 +48,7 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between text-[#35231F] dark:text-[#F7EFE5] m-0 p-0 relative overflow-y-auto selection:bg-[#4B1715] selection:text-[#FAF7F0]">
+    <div className="min-h-screen w-full flex flex-col justify-between text-[#35231F] dark:text-[#F7EFE5] m-0 p-0 relative overflow-x-hidden overflow-y-auto selection:bg-[#4B1715] selection:text-[#FAF7F0]">
       {/* Background House Animation */}
       <PropertyBackground fixed={true} overlayOpacity="dense" />
 

@@ -61,6 +61,14 @@ const Payments = () => {
         </div>
       </div>
 
+      {/* DEMO MODE NOTICE BANNER */}
+      <div className="glass-panel p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200 flex items-center gap-2.5 text-xs font-semibold">
+        <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-900 dark:text-amber-300 font-black uppercase text-[10px] tracking-wider border border-amber-500/30">
+          Demo Mode
+        </span>
+        <span>Demo Mode: No real money will be transferred. Simulated payment records are clearly tagged.</span>
+      </div>
+
       {/* FILTER SEARCH BAR */}
       <div className="glass-panel p-4 rounded-[1.75rem] border border-[#D9CBBB] dark:border-[#38251F] max-w-md shadow-xs">
         <div className="relative">
@@ -104,48 +112,82 @@ const Payments = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#D9CBBB]/40 dark:divide-[#38251F]/40">
-                {filteredPayments.map((pay) => (
-                  <tr key={pay._id} className="hover:bg-[#E9DFD0]/30 dark:hover:bg-[#2A1D18]/30 transition-colors">
-                    <td className="p-4 font-mono font-medium text-[#78685D] whitespace-nowrap">
-                      {new Date(pay.paymentDate).toLocaleDateString()}
-                    </td>
-                    <td className="p-4 font-mono font-bold text-[#38251F] dark:text-[#FAF7F1]">
-                      {pay.transactionId}
-                    </td>
-                    <td className="p-4">
-                      <div>
-                        <p className="font-semibold text-[#38251F] dark:text-[#FAF7F1]">{pay.property?.name}</p>
-                        <span className="text-[10px] text-[#78685D] dark:text-[#C5B5A5]">Resident: {pay.tenant?.name}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 font-mono font-bold text-[#78685D]">
-                      {pay.bill?.invoiceNumber || 'N/A'}
-                    </td>
-                    <td className="p-4 font-bold text-emerald-700 dark:text-emerald-400">
-                      ₹{pay.amount.toLocaleString()}
-                    </td>
-                    <td className="p-4 font-semibold text-[#78685D] uppercase">
-                      {pay.paymentMethod}
-                    </td>
-                    <td className="p-4">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 border rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        Success
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      {pay.bill && (
-                        <button
-                          onClick={() => handleDownloadReceipt(pay.bill._id, pay.bill.invoiceNumber)}
-                          className="p-1.5 text-[#78685D] hover:text-brand-600 hover:bg-[#E9DFD0]/60 rounded-lg transition-colors border border-[#D9CBBB] dark:border-[#38251F] cursor-pointer"
-                          title="Download Receipt PDF"
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {filteredPayments.map((pay) => {
+                  const isDemoTx = pay.isDemo || pay.paymentMethod === 'Demo';
+                  const isFailed = pay.status === 'failed';
+
+                  return (
+                    <tr key={pay._id} className="hover:bg-[#E9DFD0]/30 dark:hover:bg-[#2A1D18]/30 transition-colors">
+                      <td className="p-4 font-mono font-medium text-[#78685D] whitespace-nowrap">
+                        {new Date(pay.paymentDate).toLocaleDateString()}
+                      </td>
+                      <td className="p-4 font-mono font-bold text-[#38251F] dark:text-[#FAF7F1]">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>{pay.transactionId}</span>
+                          {isDemoTx && (
+                            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                              DEMO
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <div>
+                          <p className="font-semibold text-[#38251F] dark:text-[#FAF7F1]">{pay.property?.name}</p>
+                          <span className="text-[10px] text-[#78685D] dark:text-[#C5B5A5]">Resident: {pay.tenant?.name}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 font-mono font-bold text-[#78685D]">
+                        {pay.bill?.invoiceNumber || 'N/A'}
+                      </td>
+                      <td className="p-4 font-bold">
+                        {isFailed ? (
+                          <div className="text-rose-600 dark:text-rose-400">
+                            <span className="line-through">₹{pay.amount.toLocaleString()}</span>
+                            <span className="text-[10px] block font-normal text-rose-500">Not Charged</span>
+                          </div>
+                        ) : (
+                          <span className="text-emerald-700 dark:text-emerald-400">
+                            ₹{pay.amount.toLocaleString()}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 font-semibold text-[#78685D] uppercase">
+                        {pay.paymentMethod}
+                      </td>
+                      <td className="p-4">
+                        {isFailed ? (
+                          <div>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 border rounded-full text-[9px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20">
+                              Failed
+                            </span>
+                            {pay.failureReason && (
+                              <p className="text-[10px] text-rose-600 dark:text-rose-400 mt-0.5 max-w-[140px] truncate" title={pay.failureReason}>
+                                {pay.failureReason}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 border rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Success
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-center">
+                        {pay.bill && !isFailed && (
+                          <button
+                            onClick={() => handleDownloadReceipt(pay.bill._id, pay.bill.invoiceNumber)}
+                            className="p-1.5 text-[#78685D] hover:text-brand-600 hover:bg-[#E9DFD0]/60 rounded-lg transition-colors border border-[#D9CBBB] dark:border-[#38251F] cursor-pointer"
+                            title="Download Receipt PDF"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

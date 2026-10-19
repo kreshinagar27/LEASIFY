@@ -2,19 +2,25 @@ const cloudinary = require('cloudinary').v2;
 const fs = require('fs');
 const path = require('path');
 
-// Configure Cloudinary if credentials are provided
-const isCloudinaryConfigured = 
-  process.env.CLOUDINARY_CLOUD_NAME && 
-  process.env.CLOUDINARY_API_KEY && 
-  process.env.CLOUDINARY_API_SECRET;
+// Configure Cloudinary helper
+const checkAndConfigureCloudinary = () => {
+  const isConfigured = 
+    process.env.CLOUDINARY_CLOUD_NAME && 
+    process.env.CLOUDINARY_API_KEY && 
+    process.env.CLOUDINARY_API_SECRET;
 
-if (isCloudinaryConfigured) {
-  cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-  });
-}
+  if (isConfigured) {
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+  }
+  return !!isConfigured;
+};
+
+// Initial config check
+checkAndConfigureCloudinary();
 
 /**
  * Uploads a local file (from multer) and returns URL and publicId.
@@ -24,11 +30,11 @@ if (isCloudinaryConfigured) {
 const uploadToStorage = async (file, folder = 'leasify') => {
   if (!file) return null;
 
-  if (isCloudinaryConfigured) {
+  if (checkAndConfigureCloudinary()) {
     try {
-      // 4-second timeout to prevent request hanging if remote cloud is unreachable
+      // 60-second timeout to allow large images/videos to finish uploading
       const result = await new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Cloudinary request timed out')), 4000);
+        const timer = setTimeout(() => reject(new Error('Cloudinary request timed out')), 60000);
         cloudinary.uploader.upload(file.path, {
           folder: folder,
           resource_type: 'auto'
@@ -42,6 +48,7 @@ const uploadToStorage = async (file, folder = 'leasify') => {
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
       }
+      console.log(`[Storage] Uploaded to Cloudinary [${folder}]: ${result.public_id}`);
       return {
         url: result.secure_url,
         publicId: result.public_id
@@ -68,8 +75,9 @@ const deleteFromStorage = async (publicId, resourceType = 'image') => {
   if (!publicId) return;
 
   try {
-    if (isCloudinaryConfigured) {
+    if (checkAndConfigureCloudinary()) {
       await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+      console.log(`[Storage] Deleted from Cloudinary: ${publicId}`);
     } else {
       const localFilePath = path.join(__dirname, '../uploads', publicId);
       if (fs.existsSync(localFilePath)) {
@@ -84,5 +92,7 @@ const deleteFromStorage = async (publicId, resourceType = 'image') => {
 module.exports = {
   uploadToStorage,
   deleteFromStorage,
-  isCloudinaryConfigured
+  get isCloudinaryConfigured() {
+    return checkAndConfigureCloudinary();
+  }
 };

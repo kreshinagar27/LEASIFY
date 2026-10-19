@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const Bill = require('../models/Bill');
@@ -287,6 +288,155 @@ exports.getPayments = async (req, res, next) => {
       success: true,
       count: payments.length,
       data: payments
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Simulate Demo Rent Payment (Development / Demo Mode Only)
+// @route   POST /api/v1/payments/demo-simulate
+// @access  Private (Tenant Only)
+exports.simulateDemoPayment = async (req, res, next) => {
+  try {
+    const { billId, simulateOutcome = 'success', failureReason } = req.body;
+
+    if (!billId || !mongoose.Types.ObjectId.isValid(billId)) {
+      return res.status(400).json({ success: false, message: 'Valid Bill ID is required' });
+    }
+
+    const bill = await Bill.findById(billId)
+      .populate('property')
+      .populate('tenant');
+
+    if (!bill) {
+      return res.status(404).json({ success: false, message: 'Bill record not found' });
+    }
+
+    // Authorization: only the bill's resident tenant can simulate paying this bill
+    if (bill.tenant._id.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Not authorized to settle this bill' });
+    }
+
+    if (bill.status === 'paid') {
+      return res.status(400).json({ success: false, message: 'This bill has already been paid and settled' });
+    }
+
+    const outcome = String(simulateOutcome).toLowerCase().trim();
+
+    if (outcome !== 'success' && outcome !== 'failure' && outcome !== 'fail') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid simulation outcome. Must be "success" or "failure".'
+      });
+    }
+
+    // 1. SIMULATE FAILED PAYMENT
+    if (outcome === 'failure' || outcome === 'fail') {
+      const reason = failureReason || 'Simulated card declined / insufficient demo funds';
+      const failTxnId = `DEMO-FAIL-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const failedPayment = await Payment.create({
+        bill: bill._id,
+        property: bill.property._id,
+        tenant: bill.tenant._id,
+        amount: bill.totalAmount,
+        paymentMethod: 'Demo',
+        isDemo: true,
+        failureReason: reason,
+        transactionId: failTxnId,
+        status: 'failed',
+        paymentDate: new Date()
+      });
+
+      // Rent remains outstanding (bill.status is NOT changed)
+      await Notification.create({
+        user: bill.tenant._id,
+        userModel: 'Tenant',
+        title: '[DEMO] Payment Simulation Failed',
+        message: `[Demo Mode] Rent payment simulation of INR ${bill.totalAmount} for Invoice ${bill.invoiceNumber} failed: ${reason}. Bill remains outstanding.`,
+        category: 'billing'
+      });
+
+      await logActivity(
+        bill.tenant._id,
+        'Tenant',
+        'Demo Payment Failed',
+        `Demo payment simulation failed for Invoice: ${bill.invoiceNumber}. Reason: ${reason}`,
+        req
+      );
+
+      return res.status(400).json({
+        success: false,
+        isDemo: true,
+        paymentStatus: 'failed',
+        message: `[Demo Mode] Payment simulation failed: ${reason}. Rent remains outstanding.`,
+        notice: 'Demo Mode: No real money will be transferred.',
+        data: failedPayment
+      });
+    }
+
+    // 2. SIMULATE SUCCESSFUL PAYMENT
+    const successTxnId = `DEMO-TXN-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const payment = await Payment.create({
+      bill: bill._id,
+      property: bill.property._id,
+      tenant: bill.tenant._id,
+      amount: bill.totalAmount,
+      paymentMethod: 'Demo',
+      isDemo: true,
+      transactionId: successTxnId,
+      status: 'success',
+      paymentDate: new Date()
+    });
+
+    // Mark Bill as Paid
+    bill.status = 'paid';
+    bill.paidAt = new Date();
+    await bill.save();
+
+    // Generate Receipt PDF
+    try {
+      const pdfUrl = await generateBillPDF(bill, bill.tenant, bill.property, payment);
+      payment.receiptUrl = pdfUrl;
+      await payment.save();
+    } catch (pdfErr) {
+      console.warn('PDF generation note:', pdfErr.message);
+    }
+
+    // Create In-App Notifications
+    await Notification.create({
+      user: bill.property.owner,
+      userModel: 'Owner',
+      title: '[DEMO] Rent Payment Received',
+      message: `[Demo Mode] Tenant '${bill.tenant.name}' simulated rent payment of INR ${bill.totalAmount} for property '${bill.property.name}'. (No real funds transferred).`,
+      category: 'billing'
+    });
+
+    await Notification.create({
+      user: bill.tenant._id,
+      userModel: 'Tenant',
+      title: '[DEMO] Rent Payment Successful',
+      message: `[Demo Mode] Rent payment of INR ${bill.totalAmount} for Invoice ${bill.invoiceNumber} simulated successfully. Ref: ${successTxnId}. (No real funds transferred).`,
+      category: 'billing'
+    });
+
+    await logActivity(
+      bill.tenant._id,
+      'Tenant',
+      'Demo Payment Success',
+      `Demo rent payment simulation completed for Invoice: ${bill.invoiceNumber}, Amount: INR ${bill.totalAmount}`,
+      req
+    );
+
+    return res.status(200).json({
+      success: true,
+      isDemo: true,
+      paymentStatus: 'success',
+      message: 'Demo payment simulated successfully. Rent marked as paid.',
+      notice: 'Demo Mode: No real money will be transferred.',
+      data: payment
     });
   } catch (error) {
     next(error);

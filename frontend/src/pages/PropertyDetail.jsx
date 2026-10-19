@@ -227,8 +227,9 @@ const PropertyDetail = () => {
   if (property.status === 'Reserved') statusColor = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20';
 
   return (
-    <div className="space-y-6">
-      {/* Top Header */}
+    <>
+      <div className="space-y-6">
+        {/* Top Header */}
       <div className="flex justify-between items-center">
         <Link to="/properties" className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
           <ChevronLeft className="w-3.5 h-3.5" /> Back to Properties
@@ -502,10 +503,11 @@ const PropertyDetail = () => {
           />
         </div>
       </div>
+    </div>
 
       {/* EDIT PROPERTY MODAL */}
       {editModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 overflow-y-auto">
           <div className="w-full max-w-3xl glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col relative max-h-[92vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
               <div>
@@ -765,7 +767,7 @@ const PropertyDetail = () => {
 
       {/* EDIT TENANT PROFILE MODAL */}
       {editTenantModalOpen && property?.tenant && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-md p-4 overflow-y-auto">
           <div className="w-full max-w-lg glass-panel rounded-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col relative max-h-[92vh] overflow-y-auto shadow-2xl">
             <div className="flex justify-between items-center pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
               <div>
@@ -971,7 +973,7 @@ const PropertyDetail = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

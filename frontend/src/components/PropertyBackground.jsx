@@ -52,8 +52,8 @@ const PropertyBackground = ({
     <div
       aria-hidden="true"
       className={`${
-        fixed ? 'fixed -top-4 -bottom-4 -left-4 -right-4' : 'absolute -top-4 -bottom-4 -left-4 -right-4'
-      } overflow-hidden pointer-events-none -z-20 select-none`}
+        fixed ? 'fixed inset-0' : 'absolute inset-0'
+      } w-full h-full overflow-hidden pointer-events-none z-0 select-none`}
     >
       {/* 1. VIDEO LAYER (if available or configured) */}
       {videoSrc && videoAvailable ? (
@@ -94,27 +94,25 @@ const PropertyBackground = ({
       )}
 
       {/* 3. WARM REAL ESTATE TRANSLUCENT GRADIENT VEIL */}
-      {/* Light Mode: Ivory/Cream veil allowing house to remain visible with soft blur */}
-      {/* Dark Mode: Deep espresso/chocolate veil maintaining property silhouette and warm tones */}
       <div
         className={`absolute inset-0 ${
           overlayOpacity === 'dense'
-            ? 'bg-gradient-to-r from-[#F5EEE3]/92 via-[#FBF7F0]/80 to-[#F5EEE3]/70 dark:from-[#1B100E]/94 dark:via-[#261714]/85 dark:to-[#1B100E]/75'
+            ? 'bg-gradient-to-r from-[#F5EEE3]/50 via-[#FBF7F0]/30 to-[#F5EEE3]/25 dark:from-[#1B100E]/70 dark:via-[#261714]/50 dark:to-[#1B100E]/40'
             : overlayOpacity === 'light'
-            ? 'bg-gradient-to-r from-[#F5EEE3]/65 via-[#FBF7F0]/40 to-[#F5EEE3]/30 dark:from-[#1B100E]/75 dark:via-[#261714]/60 dark:to-[#1B100E]/45'
+            ? 'bg-gradient-to-r from-[#F5EEE3]/40 via-[#FBF7F0]/25 to-[#F5EEE3]/20 dark:from-[#1B100E]/60 dark:via-[#261714]/40 dark:to-[#1B100E]/30'
             : overlayOpacity === 'subtle' || overlayOpacity === 'cinematic'
             ? 'bg-black/20 backdrop-brightness-[0.95]'
-            : 'bg-gradient-to-r from-[#F5EEE3]/82 via-[#FBF7F0]/60 to-[#F5EEE3]/45 dark:from-[#1B100E]/88 dark:via-[#261714]/75 dark:to-[#1B100E]/60'
+            : 'bg-gradient-to-r from-[#F5EEE3]/60 via-[#FBF7F0]/40 to-[#F5EEE3]/30 dark:from-[#1B100E]/75 dark:via-[#261714]/60 dark:to-[#1B100E]/45'
         } backdrop-contrast-[1.02]`}
       />
 
-      {/* Subtle top-to-bottom atmospheric vignette for navbar legibility */}
+      {/* Subtle top-to-bottom atmospheric vignette for navbar legibility without edge washout */}
       {showVignette && (
         <div
           className={`absolute inset-0 pointer-events-none ${
             overlayOpacity === 'subtle' || overlayOpacity === 'cinematic'
               ? 'bg-gradient-to-b from-black/50 via-transparent to-black/40'
-              : 'bg-gradient-to-b from-[#F5EEE3]/60 via-transparent to-[#F5EEE3]/80 dark:from-[#1B100E]/70 dark:via-transparent dark:to-[#1B100E]/85'
+              : 'bg-gradient-to-b from-black/25 via-transparent to-black/30 dark:from-black/40 dark:via-transparent dark:to-black/50'
           }`}
         />
       )}

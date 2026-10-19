@@ -1,0 +1,109 @@
+warning: in the working copy of 'backend/.env.example', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/controllers/authController.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/controllers/paymentController.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/controllers/reportController.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/leasify.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/middleware/auth.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/models/Payment.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/models/Tenant.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/routes/authRoutes.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/routes/paymentRoutes.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/utils/emailService.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/utils/pdfKitHelper.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/utils/uploader.js', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/App.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/CalendarWidget.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/PasswordInput.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/components/PropertyBackground.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/index.css', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Apartments.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Bills.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/CalendarView.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Dashboard.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/ForgotPassword.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Login.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Maintenance.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Payments.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Properties.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/PropertyDetail.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Register.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/RegisterTenant.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/ResetPassword.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/TenantDetail.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/Tenants.jsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/src/pages/VerifyEmail.jsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/backend/.env.example b/backend/.env.example[m
+[1mindex 454a688..9d30829 100644[m
+[1m--- a/backend/.env.example[m
+[1m+++ b/backend/.env.example[m
+[36m@@ -11,7 +11,11 @@[m [mCLOUDINARY_CLOUD_NAME=[m
+ CLOUDINARY_API_KEY=[m
+ CLOUDINARY_API_SECRET=[m
+ [m
+[31m-# SMTP Email Settings (Optional - system prints welcome codes/passwords to console if empty)[m
+[32m+[m[32m# Gmail SMTP Settings (Recommended for real email delivery)[m
+[32m+[m[32mGMAIL_USER=your_email@gmail.com[m
+[32m+[m[32mGMAIL_APP_PASSWORD=your_16_character_app_password[m
+[32m+[m
+[32m+[m[32m# Alternative / Legacy Mailtrap Settings[m
+ EMAIL_HOST=smtp.mailtrap.io[m
+ EMAIL_PORT=2525[m
+ EMAIL_USER=[m
+[1mdiff --git a/backend/controllers/authController.js b/backend/controllers/authController.js[m
+[1mindex 05ba83d..299824b 100644[m
+[1m--- a/backend/controllers/authController.js[m
+[1m+++ b/backend/controllers/authController.js[m
+[36m@@ -133,9 +133,9 @@[m [mexports.registerOwner = async (req, res, next) => {[m
+       return res.status(409).json({ success: false, message: 'This phone number is already registered.' });[m
+     }[m
+ [m
+[31m-    // 4. SMTP check & auto-verification in dev mode[m
+[32m+[m[32m    // 4. SMTP check & verification token generation[m
+     const isSmtpConfigured = !!(process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS);[m
+[31m-    const autoVerify = !isSmtpConfigured || process.env.NODE_ENV === 'development';[m
+[32m+[m[32m    const autoVerify = !isSmtpConfigured || process.env.AUTO_VERIFY_OWNER === 'true';[m
+ [m
+     const verificationToken = autoVerify ? undefined : crypto.randomBytes(20).toString('hex');[m
+ [m
+[36m@@ -690,23 +690,35 @@[m [mexports.changePassword = async (req, res, next) => {[m
+       return res.status(400).json({ success: false, message: 'Please provide current and new passwords' });[m
+     }[m
+ [m
+[31m-    // Get user with password selected[m
+[32m+[m[32m    const trimmedNew = String(newPassword).trim();[m
+[32m+[m[32m    if (trimmedNew.length < 6) {[m
+[32m+[m[32m      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long' });[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    const role = (req.userRole || req.user?.role || '').toLowerCase();[m
+     let user;[m
+[31m-    if (req.userRole === 'owner') {[m
+[31m-      user = await Owner.findById(req.user.id).select('+password');[m
+[32m+[m[32m    if (role === 'owner') {[m
+[32m+[m[32m      user = await Owner.findById(req.user._id || req.user.id).select('+password');[m
+[32m+[m[32m    } else if (role === 'tenant') {[m
+[32m+[m[32m      user = await Tenant.findById(req.user._id || req.user.id).select('+password');[m
+     } else {[m
+[31m-      user = await Tenant.findById(req.user.id).select('+password');[m
+[32m+[m[32m      return res.status(403).json({ success: false, message: 'Invalid user role' });[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    if (!user) {[m
+[32m+[m[32m      return res.status(404).json({ success: false, message: 'User record not found' });[m
+     }[m
+ [m
+[31m-    // Check password[m
+[31m-    if (!(await user.matchPassword(currentPassword))) {[m
+[32m+[m[32m    // Check current password[m
+[32m+[m[32m    const isMatch = await user.matchPassword(currentPassword);[m
+[32m+[m[32m    if (!isMatch) {[m
+       return res.status(401).json({ success: false, message: 'Current password is incorrect' });[m
+     }[m
+ [m
+[31m-    user.password = newPassword;[m
+[32m+[m[32m    user.password = trimmedNew;[m
+     await user.save();[m
+ [m
+[31m-    await logActivity(user._id, req.userRole === 'owner' ? 'Owner' : 'Tenant', 'Change Password', 'User changed password.', req);[m
+[32m+[m[32m    await logActivi

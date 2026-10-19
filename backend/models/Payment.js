@@ -22,8 +22,16 @@ const PaymentSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['Razorpay', 'UPI', 'Manual'],
+    enum: ['Razorpay', 'UPI', 'Manual', 'Demo'],
     default: 'Razorpay'
+  },
+  isDemo: {
+    type: Boolean,
+    default: false
+  },
+  failureReason: {
+    type: String,
+    default: ''
   },
   transactionId: {
     type: String,

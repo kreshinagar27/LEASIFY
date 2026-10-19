@@ -16,8 +16,11 @@ const {
   uploadPhoto,
   changePassword,
   deleteAccount,
-  cleanDemoData
+  cleanDemoData,
+  getPreviewAccounts
 } = require('../controllers/authController');
+
+router.get('/preview-accounts', getPreviewAccounts);
 
 router.post('/register', (req, res, next) => {
   if (req.body && req.body.role === 'tenant') {

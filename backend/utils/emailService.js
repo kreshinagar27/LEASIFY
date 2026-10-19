@@ -1,41 +1,128 @@
 const nodemailer = require('nodemailer');
 
-const sendEmail = async (options) => {
-  // Check if SMTP is configured
-  const isMailConfigured = 
-    process.env.EMAIL_HOST && 
-    process.env.EMAIL_USER && 
-    process.env.EMAIL_PASS;
+/**
+ * Creates and returns the appropriate mail transporter.
+ * Priority:
+ * 1. Gmail SMTP (service: 'gmail') via GMAIL_USER & GMAIL_APP_PASSWORD
+ * 2. Generic SMTP (e.g. Mailtrap) via EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASS
+ * 3. Fallback Simulator (console output for development if unconfigured)
+ */
+const getMailConfig = () => {
+  // 1. Gmail SMTP
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    const cleanAppPassword = process.env.GMAIL_APP_PASSWORD.replace(/\s+/g, '');
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER.trim(),
+        pass: cleanAppPassword
+      }
+    });
 
-  if (!isMailConfigured) {
+    return {
+      type: 'gmail',
+      transporter,
+      from: `"Leasify" <${process.env.GMAIL_USER.trim()}>`
+    };
+  }
+
+  // 2. Generic / Mailtrap SMTP Fallback
+  if (process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    let host = process.env.EMAIL_HOST;
+    let port = parseInt(process.env.EMAIL_PORT, 10) || 2525;
+
+    if (host === 'live.smtp.mailtrap.io' && process.env.EMAIL_USER && process.env.EMAIL_USER !== 'api') {
+      console.warn('[EmailService] Mailtrap testing credentials detected; routing to sandbox.smtp.mailtrap.io.');
+      host = 'sandbox.smtp.mailtrap.io';
+      port = 2525;
+    }
+
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    return {
+      type: 'smtp',
+      transporter,
+      from: process.env.EMAIL_FROM || 'noreply@leasify.com'
+    };
+  }
+
+  // 3. Unconfigured / Simulator
+  return null;
+};
+
+const sendEmail = async (options) => {
+  const mailConfig = getMailConfig();
+
+  if (!mailConfig) {
     console.log('\n==================================================');
-    console.log(`[SMTP SIMULATOR] Sending Email to: ${options.to}`);
+    console.log(`[SMTP SIMULATOR] (No Gmail or SMTP credentials configured)`);
+    console.log(`To: ${options.to}`);
     console.log(`Subject: ${options.subject}`);
     console.log(`Body:\n${options.text || options.html}`);
     console.log('==================================================\n');
-    return { message: 'Email simulator handled mail delivery.' };
+    return {
+      simulator: true,
+      message: 'Email simulator handled mail delivery in local console.'
+    };
   }
 
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT || 2525,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
-
   const message = {
-    from: `${process.env.EMAIL_FROM || 'noreply@leasify.com'}`,
+    from: mailConfig.from,
     to: options.to,
     subject: options.subject,
     text: options.text,
     html: options.html
   };
 
-  const info = await transporter.sendMail(message);
-  console.log(`Email sent successfully: ${info.messageId}`);
-  return info;
+  const maxRetries = mailConfig.type === 'gmail' ? 1 : 2;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const info = await mailConfig.transporter.sendMail(message);
+
+      // Verify SMTP accepted the message
+      if (info.rejected && info.rejected.length > 0 && (!info.accepted || info.accepted.length === 0)) {
+        const rejectError = new Error(`SMTP server rejected delivery to recipient: ${info.rejected.join(', ')}`);
+        rejectError.code = 'ESMTPREJECT';
+        throw rejectError;
+      }
+
+      console.log(`[EmailService] [${mailConfig.type.toUpperCase()}] Message accepted by SMTP for transmission to ${options.to} (MessageId: ${info.messageId}). Note: Final delivery depends on recipient mailbox provider.`);
+      return {
+        accepted: info.accepted,
+        rejected: info.rejected,
+        messageId: info.messageId,
+        smtpResponse: info.response,
+        smtpAccepted: true
+      };
+    } catch (error) {
+      // Diagnostic error handlers
+      if (error.code === 'EAUTH' || error.responseCode === 535) {
+        console.error(`[EmailService] [GMAIL EAUTH] Authentication failed for ${mailConfig.from}. Verify that 2-Step Verification is ON and your 16-character Google App Password (without spaces) is correct.`);
+      } else if (error.code === 'EENVELOPE' || error.code === 'EDNS') {
+        console.error(`[EmailService] Recipient address or domain lookup failed for ${options.to}: ${error.message}`);
+      } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNECTION') {
+        console.error(`[EmailService] Connection to mail server timed out or was refused: ${error.message}`);
+      } else {
+        const isRateLimit = error.message && error.message.includes('Too many emails per second');
+        if (isRateLimit && attempt < maxRetries) {
+          console.warn(`[EmailService] Rate limit hit. Retrying in 1.5s (attempt ${attempt + 1}/${maxRetries})...`);
+          await new Promise(r => setTimeout(r, 1500));
+          continue;
+        }
+        console.error(`[EmailService] Delivery attempt failed to ${options.to}:`, error.message);
+      }
+
+      throw error;
+    }
+  }
 };
 
 // Onboard Tenant Welcome Email

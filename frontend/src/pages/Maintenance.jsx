@@ -111,7 +111,8 @@ const Maintenance = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-black text-[#38251F] dark:text-[#FAF7F1] Outfit">Maintenance & Support</h1>
@@ -262,6 +263,7 @@ const Maintenance = () => {
           })}
         </div>
       )}
+    </div>
 
       {/* TENANT: RAISE MAINTENANCE REQUEST MODAL */}
       {modalOpen && (
@@ -439,7 +441,7 @@ const Maintenance = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

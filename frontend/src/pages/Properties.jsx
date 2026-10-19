@@ -254,7 +254,8 @@ const Properties = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-black text-[#38251F] dark:text-[#FAF7F1] Outfit">Properties Portfolio</h1>
@@ -452,6 +453,7 @@ const Properties = () => {
           })}
         </div>
       )}
+    </div>
 
       {/* ADD PROPERTY MODAL WITH SECTION TABS */}
       {modalOpen && (
@@ -939,7 +941,7 @@ const Properties = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 

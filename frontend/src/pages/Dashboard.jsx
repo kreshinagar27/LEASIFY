@@ -391,9 +391,16 @@ const Dashboard = () => {
                         <span className="font-black text-emerald-700 dark:text-emerald-400 block text-xs">
                           +₹{Number(pay.amount || 0).toLocaleString()}
                         </span>
-                        <span className="text-[9px] text-[#78685D] font-medium">
-                          {new Date(pay.paymentDate).toLocaleDateString()}
-                        </span>
+                        <div className="flex items-center justify-end gap-1 mt-0.5">
+                          {(pay.isDemo || pay.paymentMethod === 'Demo') && (
+                            <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                              Demo
+                            </span>
+                          )}
+                          <span className="text-[9px] text-[#78685D] font-medium">
+                            {new Date(pay.paymentDate).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -791,9 +798,16 @@ const Dashboard = () => {
                     <span className="font-black text-emerald-700 dark:text-emerald-400 block text-xs">
                       ₹{Number(pay.amount || 0).toLocaleString()}
                     </span>
-                    <span className="text-[9px] px-2 py-0.5 rounded bg-[rgba(251,247,240,0.85)] dark:bg-[rgba(53,41,32,0.85)] text-[#77665A] border border-[#D9CABB]/60 uppercase font-bold">
-                      {pay.paymentMethod || 'Online'}
-                    </span>
+                    <div className="flex items-center justify-end gap-1 mt-0.5">
+                      {(pay.isDemo || pay.paymentMethod === 'Demo') && (
+                        <span className="text-[8px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 uppercase font-black tracking-wider">
+                          Demo
+                        </span>
+                      )}
+                      <span className="text-[9px] px-2 py-0.5 rounded bg-[rgba(251,247,240,0.85)] dark:bg-[rgba(53,41,32,0.85)] text-[#77665A] border border-[#D9CABB]/60 uppercase font-bold">
+                        {pay.paymentMethod || 'Online'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))

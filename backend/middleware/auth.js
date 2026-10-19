@@ -29,20 +29,11 @@ const protect = async (req, res, next) => {
 
     if (role === 'owner') {
       user = await Owner.findById(decoded.id);
-      if (!user && decoded.email) {
-        user = await Owner.findOne({ email: decoded.email });
-      }
     } else if (role === 'tenant') {
       user = await Tenant.findById(decoded.id);
-      if (!user && decoded.email) {
-        user = await Tenant.findOne({ email: decoded.email });
-      }
     } else {
-      // Fallback search across both collections by ID then email
+      // Fallback search across both collections strictly by ID
       user = await Owner.findById(decoded.id) || await Tenant.findById(decoded.id);
-      if (!user && decoded.email) {
-        user = await Owner.findOne({ email: decoded.email }) || await Tenant.findOne({ email: decoded.email });
-      }
       if (user) {
         role = user.role;
       }

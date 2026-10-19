@@ -255,7 +255,8 @@ const TenantDetail = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       {/* Top navigation */}
       <div className="flex justify-between items-center">
         <Link to="/tenants" className="inline-flex items-center gap-1 text-xs font-bold text-cream-600 hover:text-espresso dark:text-cream-400 dark:hover:text-cream-200">
@@ -466,6 +467,7 @@ const TenantDetail = () => {
           </div>
         </div>
       </div>
+    </div>
 
       {/* EDIT TENANT PROFILE MODAL */}
       {editOpen && (
@@ -766,7 +768,7 @@ const TenantDetail = () => {
         propertyName={tenant.propertyAssigned?.name}
         securityDeposit={tenant.securityDeposit}
       />
-    </div>
+    </>
   );
 };
 

@@ -133,9 +133,9 @@ exports.registerOwner = async (req, res, next) => {
       return res.status(409).json({ success: false, message: 'This phone number is already registered.' });
     }
 
-    // 4. SMTP check & auto-verification in dev mode
+    // 4. SMTP check & verification token generation
     const isSmtpConfigured = !!(process.env.EMAIL_HOST && process.env.EMAIL_USER && process.env.EMAIL_PASS);
-    const autoVerify = !isSmtpConfigured || process.env.NODE_ENV === 'development';
+    const autoVerify = !isSmtpConfigured || process.env.AUTO_VERIFY_OWNER === 'true';
 
     const verificationToken = autoVerify ? undefined : crypto.randomBytes(20).toString('hex');
 
@@ -690,23 +690,35 @@ exports.changePassword = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Please provide current and new passwords' });
     }
 
-    // Get user with password selected
-    let user;
-    if (req.userRole === 'owner') {
-      user = await Owner.findById(req.user.id).select('+password');
-    } else {
-      user = await Tenant.findById(req.user.id).select('+password');
+    const trimmedNew = String(newPassword).trim();
+    if (trimmedNew.length < 6) {
+      return res.status(400).json({ success: false, message: 'New password must be at least 6 characters long' });
     }
 
-    // Check password
-    if (!(await user.matchPassword(currentPassword))) {
+    const role = (req.userRole || req.user?.role || '').toLowerCase();
+    let user;
+    if (role === 'owner') {
+      user = await Owner.findById(req.user._id || req.user.id).select('+password');
+    } else if (role === 'tenant') {
+      user = await Tenant.findById(req.user._id || req.user.id).select('+password');
+    } else {
+      return res.status(403).json({ success: false, message: 'Invalid user role' });
+    }
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User record not found' });
+    }
+
+    // Check current password
+    const isMatch = await user.matchPassword(currentPassword);
+    if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Current password is incorrect' });
     }
 
-    user.password = newPassword;
+    user.password = trimmedNew;
     await user.save();
 
-    await logActivity(user._id, req.userRole === 'owner' ? 'Owner' : 'Tenant', 'Change Password', 'User changed password.', req);
+    await logActivity(user._id, role === 'owner' ? 'Owner' : 'Tenant', 'Change Password', `${role === 'owner' ? 'Owner' : 'Tenant'} changed password successfully.`, req);
 
     res.status(200).json({
       success: true,
@@ -770,6 +782,34 @@ exports.cleanDemoData = async (req, res, next) => {
         maintenanceDeleted: maintResult.deletedCount,
         notificationsDeleted: notifResult.deletedCount,
         auditLogsDeleted: auditResult.deletedCount
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get public preview account info (safe, non-sensitive metadata only)
+// @route   GET /api/v1/auth/preview-accounts
+// @access  Public
+exports.getPreviewAccounts = async (req, res, next) => {
+  try {
+    const owner = await Owner.findOne().select('name email role');
+    const tenant = await Tenant.findOne({ isActive: true }).select('name email role');
+
+    res.status(200).json({
+      success: true,
+      accounts: {
+        owner: {
+          name: owner?.name || 'Property Owner',
+          email: owner?.email || 'dakshvashistha1369@gmail.com',
+          role: 'owner'
+        },
+        tenant: {
+          name: tenant?.name || 'Resident Tenant',
+          email: tenant?.email || 'kreshinagar27@gmail.com',
+          role: 'tenant'
+        }
       }
     });
   } catch (error) {
