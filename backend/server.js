@@ -8,6 +8,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const app = require('./app');
 const connectDB = require('./config/db');
 const initDb = require('./utils/initDb');
+const { validateJwtConfig } = require('./config/jwt');
 
 const PORT = process.env.PORT || 5001;
 let server;
@@ -16,6 +17,7 @@ let server;
 async function startServer() {
   try {
     // 2. Validate required configuration
+    validateJwtConfig();
     if (!process.env.MONGO_URI) {
       throw new Error('MONGO_URI is missing in backend/.env');
     }
@@ -86,3 +88,5 @@ process.on('unhandledRejection', (err) => {
     process.exit(1);
   }
 });
+
+

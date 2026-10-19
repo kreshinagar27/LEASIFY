@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Owner = require('../models/Owner');
 const Tenant = require('../models/Tenant');
+const { getJwtSecret } = require('../config/jwt');
 
 // Protect routes - Verify JWT Access Token
 const protect = async (req, res, next) => {
@@ -22,7 +23,7 @@ const protect = async (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_super_secret_jwt_access_token_secret_key_12345');
+    const decoded = jwt.verify(token, getJwtSecret());
 
     let user = null;
     let role = decoded.role;
@@ -84,3 +85,4 @@ module.exports = {
   protect,
   authorize
 };
+

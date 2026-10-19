@@ -6,19 +6,20 @@ const logActivity = require('../utils/activityLogger');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../utils/emailService');
 const { uploadToStorage } = require('../utils/uploader');
 const { parsePhoneNumberFromString, isValidPhoneNumber } = require('libphonenumber-js');
+const { getJwtSecret, getJwtRefreshSecret, getJwtExpire, getJwtRefreshExpire } = require('../config/jwt');
 
 // Generate access & refresh tokens and send response
 const sendTokenResponse = (user, statusCode, res) => {
   const accessToken = jwt.sign(
     { id: user._id, email: user.email, role: user.role },
-    process.env.JWT_SECRET || 'your_super_secret_jwt_access_token_secret_key_12345',
-    { expiresIn: process.env.JWT_EXPIRE || '15m' }
+    getJwtSecret(),
+    { expiresIn: getJwtExpire() }
   );
 
   const refreshToken = jwt.sign(
     { id: user._id, email: user.email, role: user.role },
-    process.env.JWT_REFRESH_SECRET || 'your_super_secret_jwt_refresh_token_secret_key_54321',
-    { expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d' }
+    getJwtRefreshSecret(),
+    { expiresIn: getJwtRefreshExpire() }
   );
 
   const cookieOptions = {
@@ -406,7 +407,7 @@ exports.refreshToken = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET || 'your_super_secret_jwt_refresh_token_secret_key_54321');
+      decoded = jwt.verify(token, getJwtRefreshSecret());
     } catch (err) {
       return res.status(401).json({ success: false, message: 'Invalid or expired refresh token' });
     }
@@ -816,4 +817,5 @@ exports.getPreviewAccounts = async (req, res, next) => {
     next(error);
   }
 };
+
 
