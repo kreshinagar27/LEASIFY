@@ -24,3 +24,6 @@ backend/uploads/
 backend/test-screenshots/
 backend/test_image_*.png
 backend/mobile-phone-test.png
+
+# Database backups and dumps
+backups/
