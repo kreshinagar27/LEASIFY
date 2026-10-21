@@ -6,7 +6,7 @@ import {
   Users, Plus, Search, Eye, Phone, Mail, Building, Key,
   Lock, Edit, Trash2, Power, CheckCircle, XCircle, Shield,
   Calendar, Home, Sparkles, LayoutList, LayoutGrid, Check, X,
-  MapPin, UserCheck, UserX, AlertCircle
+  MapPin, UserCheck, UserX, AlertCircle, Send, Copy, RefreshCw, Ban, Link as LinkIcon
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import InternationalPhoneInput from '../components/InternationalPhoneInput';
@@ -30,6 +30,18 @@ const Tenants = () => {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [invitationsModalOpen, setInvitationsModalOpen] = useState(false);
+  const [invitations, setInvitations] = useState([]);
+  const [loadingInvitations, setLoadingInvitations] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteProperty, setInviteProperty] = useState('');
+  const [inviteApartment, setInviteApartment] = useState('');
+  const [inviteUnit, setInviteUnit] = useState('');
+  const [inviteRent, setInviteRent] = useState('');
+  const [inviteDeposit, setInviteDeposit] = useState('');
+  const [createdInviteData, setCreatedInviteData] = useState(null);
+  const [submittingInvite, setSubmittingInvite] = useState(false);
 
   const [selectedTenant, setSelectedTenant] = useState(null);
   const [newPasswordInput, setNewPasswordInput] = useState('');
@@ -96,10 +108,81 @@ const Tenants = () => {
     }
   };
 
+  const fetchInvitations = async () => {
+    setLoadingInvitations(true);
+    try {
+      const { data } = await apiClient.get('/invitations');
+      if (data.success) {
+        setInvitations(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load invitations:', err.message);
+    } finally {
+      setLoadingInvitations(false);
+    }
+  };
+
+  const handleCreateInvitation = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail) {
+      toast.error('Please enter tenant email.');
+      return;
+    }
+    setSubmittingInvite(true);
+    try {
+      const res = await apiClient.post('/invitations', {
+        email: inviteEmail.trim(),
+        propertyId: inviteProperty || null,
+        apartmentId: inviteApartment || null,
+        unitNumber: inviteUnit,
+        monthlyRent: inviteRent ? parseFloat(inviteRent) : 0,
+        securityDeposit: inviteDeposit ? parseFloat(inviteDeposit) : 0
+      });
+      if (res.data.success) {
+        toast.success(res.data.message || 'Invitation created successfully!');
+        setCreatedInviteData(res.data.data);
+        fetchInvitations();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create invitation.');
+    } finally {
+      setSubmittingInvite(false);
+    }
+  };
+
+  const handleRevokeInvitation = async (invitationId) => {
+    try {
+      const res = await apiClient.post(`/invitations/${invitationId}/revoke`);
+      if (res.data.success) {
+        toast.success('Invitation revoked successfully.');
+        fetchInvitations();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to revoke invitation.');
+    }
+  };
+
+  const handleResendInvitation = async (invitationId) => {
+    try {
+      const res = await apiClient.post(`/invitations/${invitationId}/resend`);
+      if (res.data.success) {
+        toast.success('Invitation resent with new expiration date.');
+        if (res.data.data?.inviteUrl) {
+          navigator.clipboard.writeText(res.data.data.inviteUrl);
+          toast.success('New invitation link copied to clipboard!');
+        }
+        fetchInvitations();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to resend invitation.');
+    }
+  };
+
   useEffect(() => {
     fetchTenants();
     fetchProperties();
     fetchApartments();
+    fetchInvitations();
   }, []);
 
   useEffect(() => {
@@ -364,16 +447,48 @@ const Tenants = () => {
             Create, manage credentials, assign properties & apartments for resident tenants.
           </p>
         </div>
-        <button
-          onClick={() => {
-            reset();
-            setAddSelectedProperty('');
-            setModalOpen(true);
-          }}
-          className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-[#FAF7F1] btn-primary-glow rounded-full shadow-lg transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4" /> Add Tenant
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              setInvitationsModalOpen(true);
+              fetchInvitations();
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#78685D] dark:text-[#C5B5A5] bg-[#FAF7F1] dark:bg-[#1E1715] border border-[#D9CBBB] dark:border-[#38251F] rounded-full hover:bg-[#E9DFD0]/40 transition-all cursor-pointer"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>Invitations</span>
+            {invitations.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-brand-100 dark:bg-brand-900/50 text-brand-700 dark:text-brand-300">
+                {invitations.filter(i => i.status === 'pending').length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => {
+              setInviteModalOpen(true);
+              setCreatedInviteData(null);
+              setInviteEmail('');
+              setInviteProperty('');
+              setInviteApartment('');
+              setInviteUnit('');
+              setInviteRent('');
+              setInviteDeposit('');
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold text-brand-700 dark:text-brand-300 bg-[#E9DFD0] dark:bg-[#2A1D18] border border-[#D9CBBB] dark:border-[#4A1715] rounded-full hover:scale-105 transition-all shadow-sm cursor-pointer"
+          >
+            <Send className="w-3.5 h-3.5" /> Invite Tenant
+          </button>
+          <button
+            onClick={() => {
+              reset();
+              setAddSelectedProperty('');
+              setModalOpen(true);
+            }}
+            className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-[#FAF7F1] btn-primary-glow rounded-full shadow-lg transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Add Tenant
+          </button>
+        </div>
       </div>
 
       {/* TOP SUMMARY STATS */}
@@ -1362,6 +1477,353 @@ const Tenants = () => {
                 className="w-full py-2 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-semibold text-xs rounded-xl"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ==================== MODAL: INVITE TENANT ==================== */}
+      {inviteModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel-elevated rounded-2xl w-full max-w-lg p-6 border border-[#D9CBBB] dark:border-[#38251F] shadow-2xl bg-[#FAF7F1] dark:bg-[#1E1715] max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 rounded-xl">
+                  <Send className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#38251F] dark:text-[#FAF7F1]">Invite Resident Tenant</h3>
+                  <p className="text-[11px] text-[#78685D] dark:text-[#C5B5A5]">Create a secure, single-use invitation for tenant registration</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setInviteModalOpen(false);
+                  setCreatedInviteData(null);
+                }}
+                className="text-[#78685D] hover:text-[#38251F] p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {createdInviteData ? (
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60">
+                  <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 text-xs font-bold mb-1">
+                    <CheckCircle className="w-4 h-4 text-emerald-500" /> Invitation Created Successfully!
+                  </div>
+                  <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
+                    {createdInviteData.emailDelivered
+                      ? `Invitation email sent to ${createdInviteData.email}.`
+                      : (createdInviteData.emailMessage || 'Invitation created and ready for sharing.')}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-[#38251F] dark:text-[#E9DFD0] block mb-1">
+                    Direct Registration Link (Single-Use Token):
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={createdInviteData.inviteUrl}
+                      className="flex-1 px-3 py-2 text-xs rounded-xl glass-input font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(createdInviteData.inviteUrl);
+                        toast.success('Registration link copied to clipboard!');
+                      }}
+                      className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" /> Copy
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[#78685D] dark:text-[#C5B5A5] mt-1.5">
+                    This link expires in 7 days and can only be used once with the invited email ({createdInviteData.email}).
+                  </p>
+                </div>
+
+                <div className="flex justify-end pt-3 border-t border-[#D9CBBB]/60 dark:border-[#38251F]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInviteModalOpen(false);
+                      setCreatedInviteData(null);
+                    }}
+                    className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleCreateInvitation} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-bold text-[#38251F] dark:text-[#E9DFD0] block mb-1">
+                    Tenant Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="tenant@example.com"
+                    required
+                    className="w-full px-3 py-2.5 rounded-xl glass-input text-xs"
+                  />
+                  <span className="text-[10px] text-[#78685D] dark:text-[#C5B5A5] mt-0.5 block">
+                    The registration will be cryptographically locked to this email address.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-[#38251F] dark:text-[#E9DFD0] block mb-1">
+                      Assigned Property
+                    </label>
+                    <select
+                      value={inviteProperty}
+                      onChange={(e) => {
+                        setInviteProperty(e.target.value);
+                        setInviteApartment('');
+                      }}
+                      className="w-full px-3 py-2.5 rounded-xl glass-input text-xs"
+                    >
+                      <option value="">Select Property (Optional)</option>
+                      {properties.map(p => (
+                        <option key={p._id} value={p._id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-[#38251F] dark:text-[#E9DFD0] block mb-1">
+                      Apartment / Unit
+                    </label>
+                    <select
+                      value={inviteApartment}
+                      onChange={(e) => {
+                        setInviteApartment(e.target.value);
+                        const selApt = apartments.find(a => a._id === e.target.value);
+                        if (selApt) {
+                          setInviteUnit(selApt.number || '');
+                          if (selApt.monthlyRent) setInviteRent(selApt.monthlyRent);
+                          if (selApt.securityDeposit) setInviteDeposit(selApt.securityDeposit);
+                        }
+                      }}
+                      className="w-full px-3 py-2.5 rounded-xl glass-input text-xs"
+                    >
+                      <option value="">Select Unit (Optional)</option>
+                      {apartments
+                        .filter(a => !inviteProperty || (a.property?._id || a.property) === inviteProperty)
+                        .map(a => (
+                          <option key={a._id} value={a._id}>Unit {a.number} (Floor {a.floor})</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="font-bold text-[#38251F] dark:text-[#E9DFD0] block mb-1">
+                      Unit / Flat No.
+                    </label>
+                    <input
+                      type="text"
+                      value={inviteUnit}
+                      onChange={(e) => setInviteUnit(e.target.value)}
+                      placeholder="e.g. 402-B"
+                      className="w-full px-3 py-2 rounded-xl glass-input text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-[#38251F] dark:text-[#E9DFD0] block mb-1">
+                      Monthly Rent (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={inviteRent}
+                      onChange={(e) => setInviteRent(e.target.value)}
+                      placeholder="18000"
+                      className="w-full px-3 py-2 rounded-xl glass-input text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-[#38251F] dark:text-[#E9DFD0] block mb-1">
+                      Security Deposit (₹)
+                    </label>
+                    <input
+                      type="number"
+                      value={inviteDeposit}
+                      onChange={(e) => setInviteDeposit(e.target.value)}
+                      placeholder="50000"
+                      className="w-full px-3 py-2 rounded-xl glass-input text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t border-[#D9CBBB]/60 dark:border-[#38251F]">
+                  <button
+                    type="button"
+                    onClick={() => setInviteModalOpen(false)}
+                    className="px-4 py-2 rounded-xl border border-[#D9CBBB] dark:border-[#38251F] text-[#78685D] hover:bg-[#E9DFD0]/30"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingInvite}
+                    className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {submittingInvite ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-3.5 h-3.5" /> Send Invitation
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL: INVITATIONS LIST ==================== */}
+      {invitationsModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="glass-panel-elevated rounded-2xl w-full max-w-3xl p-6 border border-[#D9CBBB] dark:border-[#38251F] shadow-2xl bg-[#FAF7F1] dark:bg-[#1E1715] max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-[#D9CBBB]/60 dark:border-[#38251F]">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300 rounded-xl">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#38251F] dark:text-[#FAF7F1]">Tenant Invitations</h3>
+                  <p className="text-[11px] text-[#78685D] dark:text-[#C5B5A5]">Track and manage your sent resident invitations</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInvitationsModalOpen(false);
+                    setInviteModalOpen(true);
+                    setCreatedInviteData(null);
+                  }}
+                  className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" /> New Invite
+                </button>
+                <button
+                  onClick={() => setInvitationsModalOpen(false)}
+                  className="text-[#78685D] hover:text-[#38251F] p-1 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-1">
+              {loadingInvitations ? (
+                <div className="py-12 text-center text-[#78685D] text-xs">Loading invitations...</div>
+              ) : invitations.length === 0 ? (
+                <div className="py-12 text-center text-[#78685D]">
+                  <Mail className="w-10 h-10 mx-auto mb-2 opacity-40" />
+                  <p className="text-xs font-medium">No invitations sent yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {invitations.map((inv) => (
+                    <div
+                      key={inv._id}
+                      className="p-3.5 rounded-xl border border-[#D9CBBB]/70 dark:border-[#38251F] bg-white/40 dark:bg-black/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-[#38251F] dark:text-[#FAF7F1]">{inv.email}</span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              inv.status === 'accepted'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                : inv.status === 'pending'
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                : inv.status === 'revoked'
+                                ? 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300'
+                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            }`}
+                          >
+                            {inv.status ? inv.status.toUpperCase() : 'PENDING'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-[#78685D] dark:text-[#C5B5A5] flex flex-wrap gap-x-3 gap-y-0.5">
+                          {inv.property && (
+                            <span>Property: <strong>{inv.property?.name || 'Assigned'}</strong></span>
+                          )}
+                          {inv.unitNumber && (
+                            <span>Unit: <strong>{inv.unitNumber}</strong></span>
+                          )}
+                          <span>Expires: {new Date(inv.expiresAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        {inv.status === 'pending' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleResendInvitation(inv._id)}
+                              title="Resend invitation email & copy new link"
+                              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300 border border-brand-200 dark:border-brand-800/50 hover:bg-brand-100 cursor-pointer flex items-center gap-1"
+                            >
+                              <RefreshCw className="w-3 h-3" /> Resend
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRevokeInvitation(inv._id)}
+                              title="Revoke invitation"
+                              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 border border-red-200 dark:border-red-900/50 hover:bg-red-100 cursor-pointer flex items-center gap-1"
+                            >
+                              <Ban className="w-3 h-3" /> Revoke
+                            </button>
+                          </>
+                        )}
+                        {inv.status === 'expired' && (
+                          <button
+                            type="button"
+                            onClick={() => handleResendInvitation(inv._id)}
+                            className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-brand-50 text-brand-700 dark:bg-brand-950/40 dark:text-brand-300 border border-brand-200 dark:border-brand-800/50 hover:bg-brand-100 cursor-pointer flex items-center gap-1"
+                          >
+                            <RefreshCw className="w-3 h-3" /> Renew & Resend
+                          </button>
+                        )}
+                        {inv.status === 'accepted' && (
+                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                            <CheckCircle className="w-3.5 h-3.5" /> Registered
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-[#D9CBBB]/60 dark:border-[#38251F] flex justify-end">
+              <button
+                type="button"
+                onClick={() => setInvitationsModalOpen(false)}
+                className="px-4 py-2 bg-[#FAF7F1] dark:bg-[#1E1715] border border-[#D9CBBB] dark:border-[#38251F] text-[#78685D] hover:bg-[#E9DFD0]/30 rounded-xl text-xs font-semibold"
+              >
+                Close
               </button>
             </div>
           </div>

@@ -1,5 +1,9 @@
+const mongoose = require('mongoose');
 const Owner = require('../models/Owner');
 const Tenant = require('../models/Tenant');
+const Invitation = require('../models/Invitation');
+const Property = require('../models/Property');
+const Apartment = require('../models/Apartment');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const logActivity = require('../utils/activityLogger');
@@ -53,15 +57,6 @@ const sendTokenResponse = (user, statusCode, res) => {
 // @access  Public
 exports.registerOwner = async (req, res, next) => {
   try {
-    // 0. ENFORCE STRICT SINGLE OWNER SYSTEM: Reject if any owner already exists
-    const existingOwner = await Owner.findOne();
-    if (existingOwner) {
-      return res.status(400).json({
-        success: false,
-        message: 'An owner account already exists.'
-      });
-    }
-
     const { name, email, password, contactNumber, address } = req.body;
 
     // 1. Validation
@@ -182,7 +177,8 @@ exports.registerOwner = async (req, res, next) => {
 // @access  Public
 exports.registerTenant = async (req, res, next) => {
   try {
-    const { name, email, password, phone, contactNumber } = req.body;
+    const { name, email, password, phone, contactNumber, invitationToken, token } = req.body;
+    const rawInvitationToken = invitationToken || token;
     const tenantPhone = phone || contactNumber;
 
     // 1. Validation
@@ -190,6 +186,14 @@ exports.registerTenant = async (req, res, next) => {
       return res.status(400).json({
         success: false,
         message: 'Please provide all required fields (name, email, password, phone number).'
+      });
+    }
+
+    // Require invitation token for resident tenant registration
+    if (!rawInvitationToken || typeof rawInvitationToken !== 'string' || !rawInvitationToken.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid invitation token is required to register as a tenant.'
       });
     }
 
@@ -254,29 +258,119 @@ exports.registerTenant = async (req, res, next) => {
       });
     }
 
-    // 4. Locate system Owner to link tenant
-    const systemOwner = await Owner.findOne();
-    if (!systemOwner) {
-      return res.status(500).json({
+    // 4. Secure Invitation Token Validation & Atomic Single-Use Consumption
+    // Hash incoming token - do NOT trust client-supplied owner, ownerId, or ownerEmail
+    const tokenHash = Invitation.hashToken(rawInvitationToken);
+
+    // Atomic find-and-update to prevent race conditions and concurrent double-consumption
+    const invitation = await Invitation.findOneAndUpdate(
+      {
+        tokenHash,
+        email: normalizedEmail,
+        status: 'pending',
+        expiresAt: { $gt: new Date() }
+      },
+      {
+        $set: {
+          status: 'accepted',
+          usedAt: new Date()
+        }
+      },
+      { new: false } // returns the document prior to acceptance
+    );
+
+    // If atomic consumption failed, inspect token to return specific security error
+    if (!invitation) {
+      const existingInv = await Invitation.findOne({ tokenHash });
+      if (!existingInv) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid invitation token.'
+        });
+      }
+      if (existingInv.status === 'revoked') {
+        return res.status(400).json({
+          success: false,
+          message: 'This invitation has been revoked by the property owner.'
+        });
+      }
+      if (existingInv.status === 'accepted') {
+        return res.status(400).json({
+          success: false,
+          message: 'This invitation token has already been used.'
+        });
+      }
+      if (new Date() >= new Date(existingInv.expiresAt) || existingInv.status === 'expired') {
+        return res.status(400).json({
+          success: false,
+          message: 'This invitation has expired. Please contact the property owner for a new invitation.'
+        });
+      }
+      if (existingInv.email !== normalizedEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email mismatch. You must register with the email address that received the invitation.'
+        });
+      }
+      return res.status(400).json({
         success: false,
-        message: 'System owner account not configured. Please contact administrator.'
+        message: 'Invitation is not valid or is no longer available.'
       });
     }
 
-    // 5. Create tenant - strictly enforce role = 'tenant' on backend!
-    const tenant = await Tenant.create({
-      name: name.trim(),
-      email: normalizedEmail,
-      password, // hashed automatically via TenantSchema pre('save')
-      phone: normalizedPhone,
-      owner: systemOwner._id,
-      role: 'tenant', // strictly forced by backend, ignores any req.body.role
-      isActive: true,
-      verified: true
+    // 5. Create Tenant bound strictly to verified invitation association
+    let tenant;
+    try {
+      tenant = await Tenant.create({
+        name: name.trim(),
+        email: normalizedEmail,
+        password, // hashed automatically via TenantSchema pre('save')
+        phone: normalizedPhone,
+        owner: invitation.owner?._id || invitation.owner, // strictly from verified invitation
+        propertyAssigned: invitation.property?._id || invitation.property || null,
+        apartmentAssigned: invitation.apartment?._id || invitation.apartment || null,
+        unitNumber: invitation.unitNumber || '',
+        monthlyRent: invitation.monthlyRent || 0,
+        securityDeposit: invitation.securityDeposit || 0,
+        role: 'tenant', // strictly forced by backend, ignores any req.body.role
+        isActive: true,
+        verified: true
+      });
+    } catch (createError) {
+      // Revert invitation status if tenant creation encounters an unexpected failure
+      await Invitation.findByIdAndUpdate(invitation._id, {
+        $set: { status: 'pending', usedAt: null }
+      });
+      throw createError;
+    }
+
+    // Link tenant back to invitation
+    await Invitation.findByIdAndUpdate(invitation._id, {
+      $set: { tenant: tenant._id }
     });
 
-    // 5. Write audit trail
-    await logActivity(tenant._id, 'Tenant', 'Registration', `Tenant ${tenant.email} registered publicly.`, req);
+    // Update property/apartment status to Occupied if assigned
+    const assignedPropertyId = invitation.property?._id || invitation.property;
+    if (assignedPropertyId) {
+      await Property.findByIdAndUpdate(assignedPropertyId, {
+        $set: { status: 'Occupied', tenant: tenant._id }
+      });
+    }
+    const assignedApartmentId = invitation.apartment?._id || invitation.apartment;
+    if (assignedApartmentId) {
+      await Apartment.findByIdAndUpdate(assignedApartmentId, {
+        $set: { status: 'Occupied' }
+      });
+    }
+
+    // 6. Write audit trail
+    await logActivity(
+      tenant._id,
+      'Tenant',
+      'Registration',
+      `Tenant ${tenant.email} registered via invitation from owner ${invitation.owner}.`,
+      req
+    );
 
     res.status(201).json({
       success: true,
@@ -740,79 +834,6 @@ exports.deleteAccount = async (req, res, next) => {
     } else {
       return res.status(400).json({ success: false, message: 'Tenants cannot delete their own account. Please contact your Landlord.' });
     }
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Clean all demo data (Properties, Apartments, Tenants, Bills, Payments, Maintenance, Notifications)
-// @route   POST /api/v1/auth/clean-demo-data
-// @access  Private (Owner only)
-exports.cleanDemoData = async (req, res, next) => {
-  try {
-    const Property = require('../models/Property');
-    const Apartment = require('../models/Apartment');
-    const Tenant = require('../models/Tenant');
-    const Bill = require('../models/Bill');
-    const Payment = require('../models/Payment');
-    const Maintenance = require('../models/Maintenance');
-    const Notification = require('../models/Notification');
-    const AuditLog = require('../models/AuditLog');
-
-    const tenantResult = await Tenant.deleteMany({});
-    const propResult = await Property.deleteMany({});
-    const aptResult = await Apartment.deleteMany({});
-    const billResult = await Bill.deleteMany({});
-    const paymentResult = await Payment.deleteMany({});
-    const maintResult = await Maintenance.deleteMany({});
-    const notifResult = await Notification.deleteMany({});
-    const auditResult = await AuditLog.deleteMany({});
-
-    // Ensure only the current owner is kept
-    await Owner.deleteMany({ _id: { $ne: req.user._id } });
-
-    res.status(200).json({
-      success: true,
-      message: 'Demo data cleaned successfully. Single owner account preserved.',
-      summary: {
-        tenantsDeleted: tenantResult.deletedCount,
-        propertiesDeleted: propResult.deletedCount,
-        apartmentsDeleted: aptResult.deletedCount,
-        billsDeleted: billResult.deletedCount,
-        paymentsDeleted: paymentResult.deletedCount,
-        maintenanceDeleted: maintResult.deletedCount,
-        notificationsDeleted: notifResult.deletedCount,
-        auditLogsDeleted: auditResult.deletedCount
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get public preview account info (safe, non-sensitive metadata only)
-// @route   GET /api/v1/auth/preview-accounts
-// @access  Public
-exports.getPreviewAccounts = async (req, res, next) => {
-  try {
-    const owner = await Owner.findOne().select('name email role');
-    const tenant = await Tenant.findOne({ isActive: true }).select('name email role');
-
-    res.status(200).json({
-      success: true,
-      accounts: {
-        owner: {
-          name: owner?.name || 'Property Owner',
-          email: owner?.email || 'dakshvashistha1369@gmail.com',
-          role: 'owner'
-        },
-        tenant: {
-          name: tenant?.name || 'Resident Tenant',
-          email: tenant?.email || 'kreshinagar27@gmail.com',
-          role: 'tenant'
-        }
-      }
-    });
   } catch (error) {
     next(error);
   }

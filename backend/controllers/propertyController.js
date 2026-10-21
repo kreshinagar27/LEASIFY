@@ -156,8 +156,19 @@ exports.getProperties = async (req, res, next) => {
     const queryObj = {};
     if (req.userRole === 'owner') {
       queryObj.owner = req.user.id;
-    } else {
+    } else if (req.userRole === 'tenant') {
+      const tenantDoc = await Tenant.findById(req.user.id);
+      if (!tenantDoc || !tenantDoc.propertyAssigned) {
+        return res.status(200).json({
+          success: true,
+          count: 0,
+          data: []
+        });
+      }
+      queryObj._id = tenantDoc.propertyAssigned;
       queryObj.isArchived = { $ne: true };
+    } else {
+      return res.status(403).json({ success: false, message: 'Forbidden. Invalid role.' });
     }
 
     // Search query across name, city, street
@@ -272,7 +283,8 @@ exports.getProperty = async (req, res, next) => {
     }
 
     // Role-based auth check
-    if (req.userRole === 'owner' && property.owner._id.toString() !== req.user.id && property.owner.toString() !== req.user.id) {
+    const propOwnerId = property.owner?._id ? property.owner._id.toString() : property.owner?.toString();
+    if (req.userRole === 'owner' && propOwnerId !== req.user.id.toString()) {
       return res.status(403).json({ success: false, message: 'Not authorized to view this property' });
     }
     if (req.userRole === 'tenant') {

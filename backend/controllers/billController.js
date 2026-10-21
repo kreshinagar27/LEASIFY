@@ -75,6 +75,14 @@ exports.generateBill = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Property not found' });
     }
 
+    if (property.owner.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to generate bill for this property' });
+    }
+
+    if (tenant.owner && tenant.owner.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to generate bill for this tenant' });
+    }
+
     // Invoice number generator
     const invoiceNumber = 'INV-' + Date.now().toString().slice(-8) + Math.floor(10 + Math.random() * 90);
 
@@ -137,19 +145,28 @@ exports.getBills = async (req, res, next) => {
     if (req.userRole === 'owner') {
       // Find properties owned by this owner
       const properties = await Property.find({ owner: req.user.id });
-      const propertyIds = properties.map(p => p._id);
-      queryObj.property = { $in: propertyIds };
+      const propertyIds = properties.map(p => p._id.toString());
+      queryObj.property = { $in: properties.map(p => p._id) };
 
-      // Apply owner search filters
-      if (req.query.tenant) {
-        queryObj.tenant = req.query.tenant;
-      }
+      // Apply owner search filters safely without allowing cross-owner override
       if (req.query.property) {
+        if (!propertyIds.includes(req.query.property.toString())) {
+          return res.status(200).json({ success: true, count: 0, data: [] });
+        }
         queryObj.property = req.query.property;
       }
-    } else {
-      // Tenant gets their own bills
+      if (req.query.tenant) {
+        const ownedTenant = await Tenant.findOne({ _id: req.query.tenant, owner: req.user.id });
+        if (!ownedTenant) {
+          return res.status(200).json({ success: true, count: 0, data: [] });
+        }
+        queryObj.tenant = req.query.tenant;
+      }
+    } else if (req.userRole === 'tenant') {
+      // Tenant gets only their own bills
       queryObj.tenant = req.user.id;
+    } else {
+      return res.status(403).json({ success: false, message: 'Forbidden. Invalid role.' });
     }
 
     if (req.query.status) {
@@ -240,6 +257,19 @@ exports.downloadBillPDF = async (req, res, next) => {
 
     if (!bill) {
       return res.status(404).json({ success: false, message: 'Bill not found' });
+    }
+
+    const propOwnerId = bill.property?.owner?._id ? bill.property.owner._id.toString() : bill.property?.owner?.toString();
+    const billTenantId = bill.tenant?._id ? bill.tenant._id.toString() : bill.tenant?.toString();
+
+    if (req.userRole === 'owner' && propOwnerId !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to download this invoice' });
+    }
+    if (req.userRole === 'tenant' && billTenantId !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to download this invoice' });
+    }
+    if (req.userRole !== 'owner' && req.userRole !== 'tenant') {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
     const payment = await Payment.findOne({ bill: bill._id, status: 'success' });

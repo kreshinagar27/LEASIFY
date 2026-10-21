@@ -16,6 +16,13 @@ const Notification = require('../models/Notification');
 const AuditLog = require('../models/AuditLog');
 
 const seedDB = async () => {
+  // Fail-safe protection: Prevent execution in production or without explicit confirmation
+  if (process.env.NODE_ENV === 'production' || process.env.ALLOW_SEED !== 'true') {
+    console.error('❌ SAFETY ABORT: Database seeding is disabled by default to prevent accidental data wipes.');
+    console.error('To run seeding in a local development environment, set ALLOW_SEED=true and ensure NODE_ENV is not production.');
+    process.exit(1);
+  }
+
   try {
     console.log('Seeding Database... Initializing Data...');
 

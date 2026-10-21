@@ -77,7 +77,7 @@ const TenantSchema = new mongoose.Schema({
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Owner',
-    required: true
+    default: null
   },
   propertyAssigned: {
     type: mongoose.Schema.Types.ObjectId,

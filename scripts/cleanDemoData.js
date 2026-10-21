@@ -16,6 +16,13 @@ const AuditLog = require('../backend/models/AuditLog');
 const PRESERVE_OWNER_EMAIL = (process.env.PRESERVE_OWNER_EMAIL || process.env.OWNER_EMAIL || 'dakshvashistha1369@gmail.com').trim().toLowerCase();
 
 const clean = async () => {
+  // Fail-safe protection: Prevent execution in production or without explicit confirmation
+  if (process.env.NODE_ENV === 'production' || process.env.ALLOW_DEMO_WIPE !== 'true') {
+    console.error('❌ SAFETY ABORT: Demo data cleanup is disabled by default to protect database integrity.');
+    console.error('To run in a local/test environment, set ALLOW_DEMO_WIPE=true and ensure NODE_ENV is not production.');
+    process.exit(1);
+  }
+
   try {
     await connectDB();
     console.log('🗑️  Starting demo data cleanup...');

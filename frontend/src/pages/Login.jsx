@@ -33,9 +33,9 @@ const Login = () => {
   const [role, setRole] = useState(queryRole || stateRole || 'owner'); // 'owner' or 'tenant'
   const [rememberMe, setRememberMe] = useState(true);
 
-  const [previewAccounts, setPreviewAccounts] = useState({
-    owner: { email: 'dakshvashistha1369@gmail.com', role: 'owner', name: 'Property Owner' },
-    tenant: { email: 'kreshinagar27@gmail.com', role: 'tenant', name: 'Resident Tenant' }
+  const [previewAccounts] = useState({
+    owner: { email: 'owner@leasify.com', role: 'owner', name: 'Property Owner' },
+    tenant: { email: 'tenant@leasify.com', role: 'tenant', name: 'Resident Tenant' }
   });
 
   const {
@@ -50,23 +50,6 @@ const Login = () => {
       password: ''
     }
   });
-
-  useEffect(() => {
-    let isMounted = true;
-    apiClient.get('/auth/preview-accounts')
-      .then(res => {
-        if (isMounted && res.data?.success && res.data.accounts) {
-          setPreviewAccounts(prev => ({
-            ...prev,
-            ...res.data.accounts
-          }));
-        }
-      })
-      .catch(() => {
-        // Safe silent fallback to defaults
-      });
-    return () => { isMounted = false; };
-  }, []);
 
   useEffect(() => {
     if (queryRole === 'tenant' || stateRole === 'tenant') {
@@ -87,7 +70,7 @@ const Login = () => {
 
   const fillDemoAccount = (demoRole) => {
     handleRoleChange(demoRole);
-    const targetEmail = previewAccounts[demoRole]?.email || (demoRole === 'owner' ? 'dakshvashistha1369@gmail.com' : 'kreshinagar27@gmail.com');
+    const targetEmail = previewAccounts[demoRole]?.email || (demoRole === 'owner' ? 'owner@leasify.com' : 'tenant@leasify.com');
     setValue('email', targetEmail, { shouldValidate: true });
     // Securely clear any old password - do not prefill stale or plaintext credentials
     setValue('password', '', { shouldValidate: false });

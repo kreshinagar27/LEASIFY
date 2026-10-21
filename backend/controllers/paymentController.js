@@ -103,6 +103,11 @@ exports.verifyPayment = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Bill not found' });
     }
 
+    const billTenantId = bill.tenant?._id ? bill.tenant._id.toString() : bill.tenant?.toString();
+    if (billTenantId !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to settle this bill' });
+    }
+
     if (bill.status === 'paid') {
       return res.status(400).json({ success: false, message: 'Bill is already paid' });
     }
@@ -211,6 +216,15 @@ exports.submitManualPayment = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Bill not found' });
     }
 
+    const billTenantId = bill.tenant?._id ? bill.tenant._id.toString() : bill.tenant?.toString();
+    if (billTenantId !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to settle this bill' });
+    }
+
+    if (bill.status === 'paid') {
+      return res.status(400).json({ success: false, message: 'Bill is already paid' });
+    }
+
     // Direct recording for simulation ease or manual verification
     const payment = await Payment.create({
       bill: bill._id,
@@ -261,17 +275,26 @@ exports.getPayments = async (req, res, next) => {
 
     if (req.userRole === 'owner') {
       const properties = await Property.find({ owner: req.user.id });
-      const propertyIds = properties.map(p => p._id);
-      queryObj.property = { $in: propertyIds };
+      const propertyIds = properties.map(p => p._id.toString());
+      queryObj.property = { $in: properties.map(p => p._id) };
 
-      if (req.query.tenant) {
-        queryObj.tenant = req.query.tenant;
-      }
       if (req.query.property) {
+        if (!propertyIds.includes(req.query.property.toString())) {
+          return res.status(200).json({ success: true, count: 0, data: [] });
+        }
         queryObj.property = req.query.property;
       }
-    } else {
+      if (req.query.tenant) {
+        const ownedTenant = await Tenant.findOne({ _id: req.query.tenant, owner: req.user.id });
+        if (!ownedTenant) {
+          return res.status(200).json({ success: true, count: 0, data: [] });
+        }
+        queryObj.tenant = req.query.tenant;
+      }
+    } else if (req.userRole === 'tenant') {
       queryObj.tenant = req.user.id;
+    } else {
+      return res.status(403).json({ success: false, message: 'Forbidden. Invalid role.' });
     }
 
     if (req.query.status) {

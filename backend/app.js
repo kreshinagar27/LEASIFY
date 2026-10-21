@@ -22,6 +22,7 @@ const maintenanceRoutes = require('./routes/maintenanceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const auditLogRoutes = require('./routes/auditLogRoutes');
+const invitationRoutes = require('./routes/invitationRoutes');
 
 const app = express();
 
@@ -105,6 +106,7 @@ app.use(['/api/v1/maintenance', '/api/maintenance'], maintenanceRoutes);
 app.use(['/api/v1/reports', '/api/reports'], reportRoutes);
 app.use(['/api/v1/notifications', '/api/notifications'], notificationRoutes);
 app.use(['/api/v1/audit-logs', '/api/audit-logs'], auditLogRoutes);
+app.use(['/api/v1/invitations', '/api/invitations'], invitationRoutes);
 
 // Health check endpoints
 app.get(['/health', '/api/health', '/api/v1/health'], (req, res) => {

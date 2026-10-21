@@ -111,14 +111,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Register Tenant handler
-  const registerTenant = async (name, email, password, phone) => {
+  const registerTenant = async (name, email, password, phone, invitationToken) => {
     setLoading(true);
     try {
       const { data } = await apiClient.post('/auth/register-tenant', {
         name,
         email,
         password,
-        phone
+        phone,
+        invitationToken
       });
       if (data && data.success) {
         toast.success(data.message || 'Tenant registration successful!');

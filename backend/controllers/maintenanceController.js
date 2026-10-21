@@ -73,17 +73,26 @@ exports.getRequests = async (req, res, next) => {
 
     if (req.userRole === 'owner') {
       const properties = await Property.find({ owner: req.user.id });
-      const propertyIds = properties.map(p => p._id);
-      queryObj.property = { $in: propertyIds };
+      const propertyIds = properties.map(p => p._id.toString());
+      queryObj.property = { $in: properties.map(p => p._id) };
 
-      if (req.query.tenant) {
-        queryObj.tenant = req.query.tenant;
-      }
       if (req.query.property) {
+        if (!propertyIds.includes(req.query.property.toString())) {
+          return res.status(200).json({ success: true, count: 0, data: [] });
+        }
         queryObj.property = req.query.property;
       }
-    } else {
+      if (req.query.tenant) {
+        const ownedTenant = await Tenant.findOne({ _id: req.query.tenant, owner: req.user.id });
+        if (!ownedTenant) {
+          return res.status(200).json({ success: true, count: 0, data: [] });
+        }
+        queryObj.tenant = req.query.tenant;
+      }
+    } else if (req.userRole === 'tenant') {
       queryObj.tenant = req.user.id;
+    } else {
+      return res.status(403).json({ success: false, message: 'Forbidden. Invalid role.' });
     }
 
     if (req.query.status) {
@@ -130,10 +139,12 @@ exports.getRequest = async (req, res, next) => {
     }
 
     // Role checks
-    if (req.userRole === 'owner' && request.property.owner._id.toString() !== req.user.id) {
+    const propOwnerId = request.property?.owner?._id ? request.property.owner._id.toString() : request.property?.owner?.toString();
+    const ticketTenantId = request.tenant?._id ? request.tenant._id.toString() : request.tenant?.toString();
+    if (req.userRole === 'owner' && propOwnerId !== req.user.id.toString()) {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
-    if (req.userRole === 'tenant' && request.tenant._id.toString() !== req.user.id) {
+    if (req.userRole === 'tenant' && ticketTenantId !== req.user.id.toString()) {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
@@ -160,6 +171,12 @@ exports.updateRequest = async (req, res, next) => {
 
     if (!request) {
       return res.status(404).json({ success: false, message: 'Ticket not found' });
+    }
+
+    // Verify owner controls the property for this maintenance ticket
+    const property = await Property.findById(request.property);
+    if (!property || property.owner.toString() !== req.user.id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized to update maintenance for this property' });
     }
 
     // Upload after images if resolving

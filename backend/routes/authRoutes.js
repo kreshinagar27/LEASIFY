@@ -15,12 +15,8 @@ const {
   updateDetails,
   uploadPhoto,
   changePassword,
-  deleteAccount,
-  cleanDemoData,
-  getPreviewAccounts
+  deleteAccount
 } = require('../controllers/authController');
-
-router.get('/preview-accounts', getPreviewAccounts);
 
 router.post('/register', (req, res, next) => {
   if (req.body && req.body.role === 'tenant') {
@@ -59,47 +55,6 @@ router.put('/update-details', protect, updateDetails);
 router.put('/upload-photo', protect, upload.single('photo'), uploadPhoto);
 router.put('/update-password', protect, changePassword);
 router.delete('/delete-account', protect, deleteAccount);
-router.post('/clean-demo-data', protect, authorize('owner'), cleanDemoData);
-router.post('/remove-all-login-data', async (req, res, next) => {
-  try {
-    const Owner = require('../models/Owner');
-    const Tenant = require('../models/Tenant');
-    const Property = require('../models/Property');
-    const Apartment = require('../models/Apartment');
-    const Bill = require('../models/Bill');
-    const Payment = require('../models/Payment');
-    const Maintenance = require('../models/Maintenance');
-    const Notification = require('../models/Notification');
-    const AuditLog = require('../models/AuditLog');
-
-    const ownersDeleted = await Owner.deleteMany({});
-    const tenantsDeleted = await Tenant.deleteMany({});
-    const propertiesDeleted = await Property.deleteMany({});
-    const apartmentsDeleted = await Apartment.deleteMany({});
-    const billsDeleted = await Bill.deleteMany({});
-    const paymentsDeleted = await Payment.deleteMany({});
-    const maintenanceDeleted = await Maintenance.deleteMany({});
-    const notificationsDeleted = await Notification.deleteMany({});
-    const auditLogsDeleted = await AuditLog.deleteMany({});
-
-    return res.status(200).json({
-      success: true,
-      message: 'All login data and user accounts successfully removed.',
-      deleted: {
-        owners: ownersDeleted.deletedCount,
-        tenants: tenantsDeleted.deletedCount,
-        properties: propertiesDeleted.deletedCount,
-        apartments: apartmentsDeleted.deletedCount,
-        bills: billsDeleted.deletedCount,
-        payments: paymentsDeleted.deletedCount,
-        maintenance: maintenanceDeleted.deletedCount,
-        notifications: notificationsDeleted.deletedCount,
-        auditLogs: auditLogsDeleted.deletedCount
-      }
-    });
-  } catch (err) {
-    next(err);
-  }
-});
 
 module.exports = router;
+

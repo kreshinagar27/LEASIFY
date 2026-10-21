@@ -85,11 +85,21 @@ exports.addTenant = async (req, res, next) => {
 
     if (apartmentAssigned && mongoose.Types.ObjectId.isValid(apartmentAssigned)) {
       apartment = await Apartment.findById(apartmentAssigned);
-      if (apartment) {
-        property = await Property.findById(apartment.property);
+      if (!apartment) {
+        return res.status(404).json({ success: false, message: 'Assigned apartment not found.' });
+      }
+      property = await Property.findById(apartment.property);
+      if (!property || property.owner.toString() !== req.user.id.toString()) {
+        return res.status(403).json({ success: false, message: 'Not authorized for this apartment or property.' });
       }
     } else if (propertyAssigned && mongoose.Types.ObjectId.isValid(propertyAssigned)) {
       property = await Property.findById(propertyAssigned);
+      if (!property) {
+        return res.status(404).json({ success: false, message: 'Assigned property not found.' });
+      }
+      if (property.owner.toString() !== req.user.id.toString()) {
+        return res.status(403).json({ success: false, message: 'Not authorized for this property.' });
+      }
     }
 
     const calcRent = parseFloat(monthlyRent) || (apartment ? apartment.monthlyRent : (property ? property.monthlyRent : 0));
@@ -339,30 +349,42 @@ exports.updateTenant = async (req, res, next) => {
       const newApartmentId = apartmentAssigned && mongoose.Types.ObjectId.isValid(apartmentAssigned) ? apartmentAssigned : null;
 
       if (oldApartmentId !== newApartmentId) {
-        if (oldApartmentId) {
+        if (newApartmentId) {
+          const newApt = await Apartment.findById(newApartmentId);
+          if (!newApt) {
+            return res.status(404).json({ success: false, message: 'Apartment not found.' });
+          }
+          const parentProp = await Property.findById(newApt.property);
+          if (!parentProp || parentProp.owner.toString() !== req.user.id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this apartment or property.' });
+          }
+
+          if (oldApartmentId) {
+            const oldApt = await Apartment.findById(oldApartmentId);
+            if (oldApt) {
+              oldApt.status = 'Vacant';
+              oldApt.tenant = null;
+              await oldApt.save();
+            }
+          }
+
+          newApt.status = 'Occupied';
+          newApt.tenant = tenant._id;
+          await newApt.save();
+          tenant.unitNumber = newApt.number;
+          tenant.propertyAssigned = newApt.property;
+
+          // Ensure parent property is also synced
+          await Property.findByIdAndUpdate(newApt.property, {
+            tenant: tenant._id,
+            status: 'Occupied'
+          });
+        } else if (oldApartmentId) {
           const oldApt = await Apartment.findById(oldApartmentId);
           if (oldApt) {
             oldApt.status = 'Vacant';
             oldApt.tenant = null;
             await oldApt.save();
-          }
-        }
-        if (newApartmentId) {
-          const newApt = await Apartment.findById(newApartmentId);
-          if (newApt) {
-            newApt.status = 'Occupied';
-            newApt.tenant = tenant._id;
-            await newApt.save();
-            tenant.unitNumber = newApt.number;
-            tenant.propertyAssigned = newApt.property;
-
-            // Ensure parent property is also synced
-            if (newApt.property) {
-              await Property.findByIdAndUpdate(newApt.property, {
-                tenant: tenant._id,
-                status: 'Occupied'
-              });
-            }
           }
         }
         tenant.apartmentAssigned = newApartmentId;
@@ -375,20 +397,33 @@ exports.updateTenant = async (req, res, next) => {
       const newPropertyId = propertyAssigned && mongoose.Types.ObjectId.isValid(propertyAssigned) ? propertyAssigned : null;
 
       if (oldPropertyId !== newPropertyId) {
-        if (oldPropertyId) {
+        if (newPropertyId) {
+          const newProp = await Property.findById(newPropertyId);
+          if (!newProp) {
+            return res.status(404).json({ success: false, message: 'Property not found.' });
+          }
+          if (newProp.owner.toString() !== req.user.id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized for this property.' });
+          }
+
+          if (oldPropertyId) {
+            const oldProp = await Property.findById(oldPropertyId);
+            if (oldProp) {
+              oldProp.status = 'Vacant';
+              oldProp.tenant = null;
+              await oldProp.save();
+            }
+          }
+
+          newProp.status = 'Occupied';
+          newProp.tenant = tenant._id;
+          await newProp.save();
+        } else if (oldPropertyId) {
           const oldProp = await Property.findById(oldPropertyId);
           if (oldProp) {
             oldProp.status = 'Vacant';
             oldProp.tenant = null;
             await oldProp.save();
-          }
-        }
-        if (newPropertyId) {
-          const newProp = await Property.findById(newPropertyId);
-          if (newProp) {
-            newProp.status = 'Occupied';
-            newProp.tenant = tenant._id;
-            await newProp.save();
           }
         }
         tenant.propertyAssigned = newPropertyId;
@@ -440,11 +475,21 @@ exports.assignProperty = async (req, res, next) => {
 
     if (apartmentId && mongoose.Types.ObjectId.isValid(apartmentId)) {
       newApartment = await Apartment.findById(apartmentId);
-      if (newApartment) {
-        newProperty = await Property.findById(newApartment.property);
+      if (!newApartment) {
+        return res.status(404).json({ success: false, message: 'Apartment not found.' });
+      }
+      newProperty = await Property.findById(newApartment.property);
+      if (!newProperty || newProperty.owner.toString() !== req.user.id.toString()) {
+        return res.status(403).json({ success: false, message: 'Not authorized for this apartment or property.' });
       }
     } else if (propertyId && mongoose.Types.ObjectId.isValid(propertyId)) {
       newProperty = await Property.findById(propertyId);
+      if (!newProperty) {
+        return res.status(404).json({ success: false, message: 'Property not found.' });
+      }
+      if (newProperty.owner.toString() !== req.user.id.toString()) {
+        return res.status(403).json({ success: false, message: 'Not authorized for this property.' });
+      }
     }
 
     // Vacate previous apartment if changing

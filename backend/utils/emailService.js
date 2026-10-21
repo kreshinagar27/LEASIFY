@@ -236,11 +236,67 @@ const sendLeaseExpiryReminderEmail = async (tenant, daysLeft) => {
   });
 };
 
+// Tenant Invitation Email
+const sendTenantInvitationEmail = async ({ email, rawToken, ownerName, propertyName, unitNumber, expiresAt }) => {
+  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const inviteUrl = `${baseUrl}/register-tenant?token=${rawToken}`;
+  const subject = `Leasify - Invitation to Join Resident Portal${propertyName ? ` (${propertyName})` : ''}`;
+  const expiryFormatted = expiresAt ? new Date(expiresAt).toLocaleDateString() : '7 days';
+
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #E2E8F0; border-radius: 12px; background-color: #ffffff;">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="color: #4F46E5; margin: 0; font-size: 24px;">Leasify Resident Portal</h1>
+        <p style="color: #64748B; font-size: 14px; margin-top: 4px;">Smart Property &amp; Rental Management</p>
+      </div>
+      
+      <p style="font-size: 16px; color: #1E293B;">Hello,</p>
+      <p style="font-size: 15px; color: #334155; line-height: 1.6;">
+        <strong>${ownerName || 'Your property manager'}</strong> has invited you to set up your resident tenant account on the Leasify Portal.
+      </p>
+
+      <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin: 20px 0;">
+        <h3 style="margin-top: 0; color: #1E293B; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">Invitation Details</h3>
+        <ul style="margin: 0; padding-left: 20px; color: #475569; font-size: 14px; line-height: 1.8;">
+          <li><strong>Invited Email:</strong> ${email}</li>
+          ${propertyName ? `<li><strong>Property:</strong> ${propertyName}</li>` : ''}
+          ${unitNumber ? `<li><strong>Unit / Apartment:</strong> ${unitNumber}</li>` : ''}
+          <li><strong>Expires On:</strong> ${expiryFormatted}</li>
+        </ul>
+      </div>
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${inviteUrl}" style="background-color: #4F46E5; color: #ffffff; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; display: inline-block;">
+          Accept Invitation &amp; Register
+        </a>
+      </div>
+
+      <p style="font-size: 13px; color: #64748B; line-height: 1.5;">
+        If the button above does not work, copy and paste the following URL into your browser:<br/>
+        <a href="${inviteUrl}" style="color: #4F46E5; word-break: break-all;">${inviteUrl}</a>
+      </p>
+
+      <hr style="border: none; border-top: 1px solid #E2E8F0; margin: 24px 0;" />
+      <p style="font-size: 12px; color: #94A3B8; text-align: center; margin: 0;">
+        This is an automated invitation from Leasify. If you did not expect this invitation, you can safely ignore this email.
+      </p>
+    </div>
+  `;
+
+  return await sendEmail({
+    to: email,
+    subject,
+    html
+  });
+};
+
 module.exports = {
   sendEmail,
   sendTenantWelcomeEmail,
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendRentReminderEmail,
-  sendLeaseExpiryReminderEmail
+  sendLeaseExpiryReminderEmail,
+  sendTenantInvitationEmail
 };
+
