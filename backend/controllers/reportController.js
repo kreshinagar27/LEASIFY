@@ -13,24 +13,14 @@ exports.getOwnerDashboard = async (req, res, next) => {
   try {
     const ownerId = req.user.id;
 
-    // Fetch Owner's properties & active tenants
-    const properties = await Property.find({ owner: ownerId });
+    // Phase 1: Concurrently fetch owner-scoped root collections
+    const [properties, allTenants, recentActivities] = await Promise.all([
+      Property.find({ owner: ownerId }),
+      Tenant.find({ owner: ownerId }),
+      AuditLog.find({ user: ownerId }).sort({ createdAt: -1 }).limit(6)
+    ]);
+
     const propertyIds = properties.map(p => p._id);
-    
-    const allTenants = await Tenant.find({ owner: ownerId });
-    const totalTenants = allTenants.length;
-    const activeTenants = allTenants.filter(t => t.isActive).length;
-    const inactiveTenants = totalTenants - activeTenants;
-
-    const apartments = await Apartment.find({ property: { $in: propertyIds } });
-    const totalApartments = apartments.length;
-    const vacantApartments = apartments.filter(a => a.status === 'Vacant').length;
-    const occupiedApartments = apartments.filter(a => a.status === 'Occupied').length;
-
-    const tenants = allTenants.filter(t => t.isActive);
-    const tenantIds = tenants.map(t => t._id);
-
-    // Property stats
     const totalProperties = properties.length;
     const occupiedProperties = properties.filter(p => p.status === 'Occupied').length;
     const vacantProperties = properties.filter(p => p.status === 'Vacant').length;
@@ -47,32 +37,11 @@ exports.getOwnerDashboard = async (req, res, next) => {
       }
     });
 
-    const now = new Date();
-    const currentMonth = now.getMonth() + 1; // 1-indexed
-    const currentYear = now.getFullYear();
+    const totalTenants = allTenants.length;
+    const activeTenants = allTenants.filter(t => t.isActive).length;
+    const inactiveTenants = totalTenants - activeTenants;
 
-    // Fetch bills for current month & year
-    const monthlyBills = await Bill.find({
-      property: { $in: propertyIds },
-      month: currentMonth,
-      year: currentYear
-    });
-
-    let receivedRent = 0;
-    let pendingRent = 0;
-    let overdueRent = 0;
-
-    monthlyBills.forEach(b => {
-      if (b.status === 'paid') {
-        receivedRent += b.totalAmount;
-      } else if (b.status === 'overdue') {
-        overdueRent += b.totalAmount;
-      } else {
-        pendingRent += b.totalAmount;
-      }
-    });
-
-    // Also calculate total security deposits held
+    const tenants = allTenants.filter(t => t.isActive);
     let totalSecurityDeposits = 0;
     let refundableDeposits = 0;
     tenants.forEach(t => {
@@ -82,88 +51,167 @@ exports.getOwnerDashboard = async (req, res, next) => {
       }
     });
 
-    // Yearly Revenue
-    const yearlyPayments = await Payment.find({
-      property: { $in: propertyIds },
-      status: 'success',
-      paymentDate: {
-        $gte: new Date(currentYear, 0, 1),
-        $lte: new Date(currentYear, 11, 31)
-      }
-    });
-    
-    let yearlyRevenue = 0;
-    yearlyPayments.forEach(p => {
-      yearlyRevenue += p.amount;
-    });
+    // Date setup
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1; // 1-indexed
+    const currentYear = now.getFullYear();
 
-    // Rent collection rate
-    const rentCollectionRate = expectedMonthlyIncome > 0 ? Math.round((receivedRent / expectedMonthlyIncome) * 100) : 0;
-
-    // Maintenance ticket stats
-    const maintenanceTickets = await Maintenance.find({ property: { $in: propertyIds } });
-    const pendingComplaints = maintenanceTickets.filter(t => t.status === 'pending').length;
-    const activeComplaints = maintenanceTickets.filter(t => t.status === 'accepted').length;
-    const resolvedComplaints = maintenanceTickets.filter(t => t.status === 'resolved').length;
-
-    // Recent Payments
-    const recentPayments = await Payment.find({ property: { $in: propertyIds }, status: 'success' })
-      .populate('tenant', 'name profilePhoto')
-      .populate('property', 'name')
-      .sort({ paymentDate: -1 })
-      .limit(5);
-
-    // Recent Audit Logs
-    const recentActivities = await AuditLog.find({ user: ownerId })
-      .sort({ createdAt: -1 })
-      .limit(6);
-
-    // Chart Data calculations:
-    // 1. Monthly cashflow (last 6 months)
-    const cashFlowData = [];
-    const cashFlowLabels = [];
+    // Setup 6-month cashflow bins (start-inclusive, end-exclusive boundaries)
+    const monthBins = [];
     for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const m = d.getMonth() + 1;
+      // Anchor to 1st of the month before subtracting to prevent month overflow (e.g. March 31 - 1 month skipping Feb)
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const m = d.getMonth();
       const y = d.getFullYear();
       const monthName = d.toLocaleString('default', { month: 'short' });
-      
-      const monthlySum = await Payment.find({
-        property: { $in: propertyIds },
-        status: 'success',
-        paymentDate: {
-          $gte: new Date(y, m - 1, 1),
-          $lte: new Date(y, m, 0)
-        }
+      monthBins.push({
+        label: `${monthName} ${y}`,
+        startDate: new Date(y, m, 1),
+        endDate: new Date(y, m + 1, 1),
+        sum: 0
       });
-      
-      let sum = 0;
-      monthlySum.forEach(p => sum += p.amount);
-      cashFlowData.push(sum);
-      cashFlowLabels.push(`${monthName} ${y}`);
     }
 
-    // 2. Complaint Categories Distribution
+    const cashFlowLabels = monthBins.map(b => b.label);
+    let cashFlowData = [0, 0, 0, 0, 0, 0];
+    let totalApartments = 0;
+    let vacantApartments = 0;
+    let occupiedApartments = 0;
+    let receivedRent = 0;
+    let pendingRent = 0;
+    let overdueRent = 0;
+    let yearlyRevenue = 0;
+    let pendingComplaints = 0;
+    let activeComplaints = 0;
+    let resolvedComplaints = 0;
+    let recentPayments = [];
     const complaintCategories = ['Electrical', 'Water', 'Plumbing', 'Cleaning', 'Internet', 'Security', 'Furniture', 'Others'];
-    const complaintData = complaintCategories.map(cat => {
-      return maintenanceTickets.filter(t => t.category === cat).length;
-    });
+    let complaintData = [0, 0, 0, 0, 0, 0, 0, 0];
+    let propertyLabels = [];
+    let propertyData = [];
 
-    // 3. Property Yields (Top properties by revenue)
-    const propertyRevenueMap = {};
-    properties.forEach(p => {
-      propertyRevenueMap[p.name] = 0;
-    });
-    yearlyPayments.forEach(pay => {
-      // Find property name
-      const prop = properties.find(p => p._id.toString() === pay.property.toString());
-      if (prop) {
-        propertyRevenueMap[prop.name] = (propertyRevenueMap[prop.name] || 0) + pay.amount;
+    // Phase 2: Concurrently query all property-dependent sub-collections
+    if (propertyIds.length > 0) {
+      const earliestCashflowDate = monthBins[0].startDate;
+      const latestCashflowDate = monthBins[monthBins.length - 1].endDate;
+
+      const [
+        apartments,
+        monthlyBills,
+        yearlyPayments,
+        maintenanceTickets,
+        recentPaymentsResult,
+        sixMonthPayments
+      ] = await Promise.all([
+        Apartment.find({ property: { $in: propertyIds } }),
+        Bill.find({ property: { $in: propertyIds }, month: currentMonth, year: currentYear }),
+        Payment.find({
+          property: { $in: propertyIds },
+          status: 'success',
+          paymentDate: {
+            $gte: new Date(currentYear, 0, 1),
+            $lt: new Date(currentYear + 1, 0, 1)
+          }
+        }),
+        Maintenance.find({ property: { $in: propertyIds } }),
+        Payment.find({ property: { $in: propertyIds }, status: 'success' })
+          .populate('tenant', 'name profilePhoto')
+          .populate('property', 'name')
+          .sort({ paymentDate: -1 })
+          .limit(5),
+        // Consolidated single query for 6-month cashflow replacing 6 serial queries
+        // Uses start-inclusive ($gte) and end-exclusive ($lt) covering the complete 6 months
+        Payment.find({
+          property: { $in: propertyIds },
+          status: 'success',
+          paymentDate: {
+            $gte: earliestCashflowDate,
+            $lt: latestCashflowDate
+          }
+        }, 'amount paymentDate')
+      ]);
+
+      totalApartments = apartments.length;
+      vacantApartments = apartments.filter(a => a.status === 'Vacant').length;
+      occupiedApartments = apartments.filter(a => a.status === 'Occupied').length;
+
+      monthlyBills.forEach(b => {
+        if (b.status === 'paid') {
+          receivedRent += b.totalAmount;
+        } else if (b.status === 'overdue') {
+          overdueRent += b.totalAmount;
+        } else {
+          pendingRent += b.totalAmount;
+        }
+      });
+
+      yearlyPayments.forEach(p => {
+        if (p) {
+          if (typeof p.amount === 'number' && !isNaN(p.amount)) {
+            yearlyRevenue += p.amount;
+          } else if (typeof p.amount === 'string' && p.amount.trim() !== '') {
+            const num = Number(p.amount);
+            if (!isNaN(num)) yearlyRevenue += num;
+          }
+        }
+      });
+
+      pendingComplaints = maintenanceTickets.filter(t => t.status === 'pending').length;
+      activeComplaints = maintenanceTickets.filter(t => t.status === 'accepted').length;
+      resolvedComplaints = maintenanceTickets.filter(t => t.status === 'resolved').length;
+
+      recentPayments = recentPaymentsResult;
+
+      // Bin 6-month payments in memory into their respective calendar months
+      for (const p of sixMonthPayments) {
+        if (!p || !p.paymentDate) continue;
+        const pDate = new Date(p.paymentDate);
+        if (isNaN(pDate.getTime())) continue;
+
+        let amount = 0;
+        if (typeof p.amount === 'number') {
+          amount = isNaN(p.amount) ? 0 : p.amount;
+        } else if (typeof p.amount === 'string' && p.amount.trim() !== '') {
+          const num = Number(p.amount);
+          amount = isNaN(num) ? 0 : num;
+        }
+
+        for (const bin of monthBins) {
+          if (pDate >= bin.startDate && pDate < bin.endDate) {
+            bin.sum += amount;
+            break;
+          }
+        }
       }
-    });
-    const propertyLabels = Object.keys(propertyRevenueMap).slice(0, 5);
-    const propertyData = Object.values(propertyRevenueMap).slice(0, 5);
+      cashFlowData = monthBins.map(b => b.sum);
+
+      complaintData = complaintCategories.map(cat => {
+        return maintenanceTickets.filter(t => t.category === cat).length;
+      });
+
+      const propertyRevenueMap = {};
+      properties.forEach(p => {
+        propertyRevenueMap[p.name] = 0;
+      });
+      yearlyPayments.forEach(pay => {
+        if (!pay || !pay.property) return;
+        const prop = properties.find(p => p._id.toString() === pay.property.toString());
+        if (prop) {
+          let payAmt = 0;
+          if (typeof pay.amount === 'number' && !isNaN(pay.amount)) {
+            payAmt = pay.amount;
+          } else if (typeof pay.amount === 'string' && pay.amount.trim() !== '') {
+            const num = Number(pay.amount);
+            if (!isNaN(num)) payAmt = num;
+          }
+          propertyRevenueMap[prop.name] = (propertyRevenueMap[prop.name] || 0) + payAmt;
+        }
+      });
+      propertyLabels = Object.keys(propertyRevenueMap).slice(0, 5);
+      propertyData = Object.values(propertyRevenueMap).slice(0, 5);
+    }
+
+    const rentCollectionRate = expectedMonthlyIncome > 0 ? Math.round((receivedRent / expectedMonthlyIncome) * 100) : 0;
 
     res.status(200).json({
       success: true,
