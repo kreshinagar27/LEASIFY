@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -482,7 +482,7 @@ const Layout = ({ children }) => {
 
         {/* PAGE BODY */}
         <main className="flex-1 px-4 sm:px-8 py-6 relative">
-          {children}
+          {children || <Outlet />}
         </main>
       </div>
     </div >

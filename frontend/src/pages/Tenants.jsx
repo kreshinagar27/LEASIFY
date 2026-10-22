@@ -178,12 +178,14 @@ const Tenants = () => {
     }
   };
 
-  // Only fetch tenant list on initial page mount
+  // Fetch tenant list, and prefetch properties & apartments in the background for modal readiness
   useEffect(() => {
     fetchTenants();
+    fetchProperties();
+    fetchApartments();
   }, []);
 
-  // Defer fetching properties & apartments until an onboarding, edit, assign, or invite modal is opened
+  // Fallback: If properties or apartments are not yet loaded when a modal is opened, fetch them
   useEffect(() => {
     if (modalOpen || editModalOpen || assignModalOpen || inviteModalOpen) {
       if (properties.length === 0) {

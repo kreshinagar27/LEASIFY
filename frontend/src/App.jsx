@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import EntryAnimation from './components/EntryAnimation';
@@ -27,14 +27,51 @@ const Profile = lazy(() => import('./pages/Profile'));
 const Search = lazy(() => import('./pages/Search'));
 const Landing = lazy(() => import('./pages/Landing'));
 
-// Lightweight, seamless loading fallback
+// Full-screen loading fallback for guest/entry transitions
 const RouteFallback = () => (
   <div className="min-h-[50vh] flex items-center justify-center p-8">
     <div className="w-8 h-8 rounded-full border-2 border-[#4A1715] dark:border-[#E6D3BF] border-t-transparent animate-spin opacity-80" />
   </div>
 );
 
-// Home Route: Shows public Landing page for guests, Dashboard for logged-in users
+// Content-region loading fallback: non-blocking, theme-consistent, preserves Layout shell
+const ContentFallback = () => (
+  <div className="w-full min-h-[40vh] flex flex-col items-center justify-center p-8 transition-opacity duration-200">
+    <div className="w-7 h-7 rounded-full border-2 border-[#4A1715] dark:border-[#E6D3BF] border-t-transparent animate-spin opacity-70" />
+    <span className="mt-3 text-xs font-medium text-[#77665A] dark:text-[#AA9886] tracking-wide animate-pulse">
+      Loading...
+    </span>
+  </div>
+);
+
+// Persistent Application Layout: keeps Layout shell mounted across all authenticated page switches
+const AppLayout = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  // Authenticated: Layout shell stays mounted; lazy chunks load inside <Outlet /> with in-content spinner
+  if (user) {
+    return (
+      <Layout>
+        <Suspense fallback={<ContentFallback />}>
+          <Outlet />
+        </Suspense>
+      </Layout>
+    );
+  }
+
+  // Public/guest navigation: renders child route directly without Layout shell
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      <Outlet />
+    </Suspense>
+  );
+};
+
+// Home Route: Shows public Landing page for guests, Dashboard within layout for logged-in users
 const HomeRoute = () => {
   const { user, loading } = useAuth();
 
@@ -46,11 +83,7 @@ const HomeRoute = () => {
     return <Landing />;
   }
 
-  return (
-    <Layout>
-      <Dashboard />
-    </Layout>
-  );
+  return <Dashboard />;
 };
 
 // Protected Route Guard Wrapper
@@ -69,10 +102,10 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
     return <Navigate to="/" replace />;
   }
 
-  return <Layout>{children}</Layout>;
+  return children;
 };
 
-// Guest Route Guard Wrapper (Redirects to dashboard if already logged in)
+// Guest Route Guard Wrapper (Redirects to / if already logged in)
 const GuestRoute = ({ children }) => {
   const { user, loading } = useAuth();
 
@@ -84,24 +117,30 @@ const GuestRoute = ({ children }) => {
     return <Navigate to="/" replace />;
   }
 
-  return children;
+  return (
+    <Suspense fallback={<RouteFallback />}>
+      {children}
+    </Suspense>
+  );
 };
 
 const App = () => {
   return (
     <>
       <EntryAnimation />
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          {/* Public Landing & Guest Authentication Routes */}
+      <Routes>
+        {/* Public Landing & Guest Authentication Routes */}
+        <Route path="/landing" element={<Suspense fallback={<RouteFallback />}><Landing /></Suspense>} />
+        <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
+        <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
+        <Route path="/register-tenant" element={<GuestRoute><RegisterTenant /></GuestRoute>} />
+        <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
+        <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
+        <Route path="/verify-email" element={<GuestRoute><VerifyEmail /></GuestRoute>} />
+
+        {/* Persistent Application Shell for Home & Protected Routes */}
+        <Route element={<AppLayout />}>
           <Route path="/" element={<HomeRoute />} />
-          <Route path="/landing" element={<Landing />} />
-          <Route path="/login" element={<GuestRoute><Login /></GuestRoute>} />
-          <Route path="/register" element={<GuestRoute><Register /></GuestRoute>} />
-          <Route path="/register-tenant" element={<GuestRoute><RegisterTenant /></GuestRoute>} />
-          <Route path="/forgot-password" element={<GuestRoute><ForgotPassword /></GuestRoute>} />
-          <Route path="/reset-password" element={<GuestRoute><ResetPassword /></GuestRoute>} />
-          <Route path="/verify-email" element={<GuestRoute><VerifyEmail /></GuestRoute>} />
 
           {/* Role Dashboards */}
           <Route
@@ -256,11 +295,11 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+        </Route>
 
-      {/* Fallback routing */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+        {/* Fallback routing */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </>
   );
 };

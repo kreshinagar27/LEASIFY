@@ -83,7 +83,14 @@ const Bills = () => {
     fetchBills();
   }, [month, year, status]);
 
-  // Fetch active tenants only when the invoice generation modal is opened by an owner
+  // Prefetch active tenants in the background when an owner enters the Bills page
+  useEffect(() => {
+    if (user?.role === 'owner') {
+      fetchActiveTenants();
+    }
+  }, [user?.role]);
+
+  // Fallback: If active tenants are not yet loaded when the invoice modal is opened, fetch them
   useEffect(() => {
     if (user?.role === 'owner' && modalOpen && activeTenants.length === 0) {
       fetchActiveTenants();

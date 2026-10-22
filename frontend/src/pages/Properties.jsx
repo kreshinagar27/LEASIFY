@@ -46,11 +46,11 @@ const Properties = () => {
 
   const abortControllerRef = useRef(null);
 
-  // Debounce search input by 300ms to avoid spamming the backend
+  // Debounce search input by 200ms to balance backend efficiency with typing responsiveness
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
-    }, 300);
+    }, 200);
     return () => clearTimeout(handler);
   }, [search]);
 
