@@ -78,12 +78,17 @@ const Bills = () => {
     }
   };
 
+  // Fetch bills when filter changes
   useEffect(() => {
     fetchBills();
-    if (user.role === 'owner') {
+  }, [month, year, status]);
+
+  // Fetch active tenants only when the invoice generation modal is opened by an owner
+  useEffect(() => {
+    if (user?.role === 'owner' && modalOpen && activeTenants.length === 0) {
       fetchActiveTenants();
     }
-  }, [month, year, status]);
+  }, [user?.role, modalOpen, activeTenants.length]);
 
   // Invoice generator submit
   const onGenerateSubmit = async (data) => {

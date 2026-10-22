@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import apiClient from '../services/api';
 import MapComponent from '../components/MapComponent';
@@ -37,11 +37,22 @@ const Properties = () => {
 
   // Search / filter states
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [city, setCity] = useState('');
   const [status, setStatus] = useState('');
   const [type, setType] = useState('');
   const [minRent, setMinRent] = useState('');
   const [maxRent, setMaxRent] = useState('');
+
+  const abortControllerRef = useRef(null);
+
+  // Debounce search input by 300ms to avoid spamming the backend
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [search]);
 
   const [deleteModalState, setDeleteModalState] = useState(null);
   const [editingProperty, setEditingProperty] = useState(null);
@@ -63,31 +74,51 @@ const Properties = () => {
     }
   });
 
-  const fetchProperties = async () => {
+  const fetchProperties = useCallback(async () => {
+    // Cancel any previous in-flight search request to prevent stale out-of-order responses
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
     try {
       const params = {};
-      if (search) params.search = search;
+      if (debouncedSearch) params.search = debouncedSearch;
       if (city) params.city = city;
       if (status) params.status = status;
       if (type) params.type = type;
       if (minRent) params.minRent = minRent;
       if (maxRent) params.maxRent = maxRent;
 
-      const { data } = await apiClient.get('/properties', { params });
+      const { data } = await apiClient.get('/properties', {
+        params,
+        signal: controller.signal
+      });
       if (data.success) {
         setProperties(data.data);
       }
     } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED' || err.message === 'canceled') {
+        return; // Obsolete request aborted; ignore silently
+      }
       toast.error('Failed to load properties.');
     } finally {
-      setLoading(false);
+      if (abortControllerRef.current === controller) {
+        setLoading(false);
+      }
     }
-  };
+  }, [debouncedSearch, city, status, type, minRent, maxRent]);
 
   useEffect(() => {
     fetchProperties();
-  }, [search, city, status, type, minRent, maxRent]);
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [fetchProperties]);
 
   const handleLocationSelect = (newLat, newLng) => {
     setLat(newLat);

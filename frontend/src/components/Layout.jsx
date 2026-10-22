@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -27,59 +27,166 @@ import {
 import apiClient from '../services/api';
 import toast from 'react-hot-toast';
 
+// Module-level cache scoped strictly to the active authenticated user ID
+let notificationCache = {
+  userId: null,
+  data: [],
+  timestamp: 0
+};
+
 const Layout = ({ children }) => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
+  const currentUserId = user?._id || user?.id || null;
+  const abortControllerRef = useRef(null);
+  const activeUserIdRef = useRef(currentUserId);
+  activeUserIdRef.current = currentUserId;
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notiOpen, setNotiOpen] = useState(false);
-  const [notifications, setNotifications] = useState([]);
+
+  // Initialize strictly with cached data belonging to currentUserId; empty for unverified/new users
+  const [notifications, setNotifications] = useState(() => {
+    if (currentUserId && notificationCache.userId === currentUserId) {
+      return notificationCache.data;
+    }
+    return [];
+  });
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch notifications
-  const fetchNotifications = async () => {
+  // Clear state and invalidate cache whenever user identity changes or logs out
+  useEffect(() => {
+    activeUserIdRef.current = currentUserId;
+    if (!currentUserId) {
+      notificationCache = { userId: null, data: [], timestamp: 0 };
+      setNotifications([]);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+      return;
+    }
+
+    if (notificationCache.userId !== currentUserId) {
+      notificationCache = { userId: currentUserId, data: [], timestamp: 0 };
+      setNotifications([]);
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    }
+  }, [currentUserId]);
+
+  // Fetch notifications with 15s deduplication threshold scoped to currentUserId
+  const fetchNotifications = async (force = false) => {
+    const targetUserId = currentUserId;
+    if (!targetUserId) {
+      setNotifications([]);
+      return;
+    }
+
+    const now = Date.now();
+    if (
+      !force &&
+      notificationCache.userId === targetUserId &&
+      now - notificationCache.timestamp < 15000 &&
+      notificationCache.data.length > 0
+    ) {
+      setNotifications(notificationCache.data);
+      return;
+    }
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const { data } = await apiClient.get('/notifications');
-      if (data.success) {
+      const { data } = await apiClient.get('/notifications', {
+        signal: controller.signal
+      });
+      // Strict multi-point validation before committing response to state or cache:
+      // 1. Target user ID is still the currently active user ID
+      // 2. notificationCache.userId matches target user ID
+      // 3. Controller has not been superseded by a newer request
+      // 4. Controller signal has not been aborted
+      // 5. Response indicates success
+      if (
+        targetUserId === activeUserIdRef.current &&
+        notificationCache.userId === targetUserId &&
+        abortControllerRef.current === controller &&
+        !controller.signal.aborted &&
+        data?.success
+      ) {
+        notificationCache = {
+          userId: targetUserId,
+          data: data.data,
+          timestamp: Date.now()
+        };
         setNotifications(data.data);
       }
     } catch (err) {
-      console.error('Error fetching notifications:', err.message);
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED' || err.message === 'canceled') {
+        return; // Request canceled due to user logout or new request
+      }
+      // Only log if the request still belongs to the active user and has not been superseded
+      if (targetUserId === activeUserIdRef.current && abortControllerRef.current === controller) {
+        console.error('Error fetching notifications:', err.message);
+      }
     }
   };
 
   useEffect(() => {
-    if (user) {
+    if (currentUserId) {
       fetchNotifications();
-      const interval = setInterval(fetchNotifications, 45000);
-      return () => clearInterval(interval);
+      const interval = setInterval(() => fetchNotifications(true), 45000);
+      return () => {
+        clearInterval(interval);
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      };
     }
-  }, [user]);
+  }, [currentUserId]);
 
   const handleMarkAllRead = async () => {
+    if (!currentUserId || activeUserIdRef.current !== currentUserId) return;
     try {
       const { data } = await apiClient.put('/notifications/read-all');
-      if (data.success) {
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      if (data.success && activeUserIdRef.current === currentUserId && notificationCache.userId === currentUserId) {
+        setNotifications(prev => {
+          const updated = prev.map(n => ({ ...n, read: true }));
+          notificationCache.data = updated;
+          return updated;
+        });
         toast.success('All notifications marked as read');
       }
     } catch (err) {
-      toast.error('Failed to update notifications');
+      if (activeUserIdRef.current === currentUserId) {
+        toast.error('Failed to update notifications');
+      }
     }
   };
 
   const handleDeleteNoti = async (id, e) => {
     e.stopPropagation();
+    if (!currentUserId || activeUserIdRef.current !== currentUserId) return;
     try {
       const { data } = await apiClient.delete(`/notifications/${id}`);
-      if (data.success) {
-        setNotifications(prev => prev.filter(n => n._id !== id));
+      if (data.success && activeUserIdRef.current === currentUserId && notificationCache.userId === currentUserId) {
+        setNotifications(prev => {
+          const updated = prev.filter(n => n._id !== id);
+          notificationCache.data = updated;
+          return updated;
+        });
         toast.success('Notification cleared');
       }
     } catch (err) {
-      toast.error('Failed to delete notification');
+      if (activeUserIdRef.current === currentUserId) {
+        toast.error('Failed to delete notification');
+      }
     }
   };
 

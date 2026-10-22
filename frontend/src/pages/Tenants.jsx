@@ -178,12 +178,29 @@ const Tenants = () => {
     }
   };
 
+  // Only fetch tenant list on initial page mount
   useEffect(() => {
     fetchTenants();
-    fetchProperties();
-    fetchApartments();
-    fetchInvitations();
   }, []);
+
+  // Defer fetching properties & apartments until an onboarding, edit, assign, or invite modal is opened
+  useEffect(() => {
+    if (modalOpen || editModalOpen || assignModalOpen || inviteModalOpen) {
+      if (properties.length === 0) {
+        fetchProperties();
+      }
+      if (apartments.length === 0) {
+        fetchApartments();
+      }
+    }
+  }, [modalOpen, editModalOpen, assignModalOpen, inviteModalOpen, properties.length, apartments.length]);
+
+  // Defer fetching invitations until the invitations modal is opened
+  useEffect(() => {
+    if (invitationsModalOpen && invitations.length === 0) {
+      fetchInvitations();
+    }
+  }, [invitationsModalOpen, invitations.length]);
 
   useEffect(() => {
     if (onboardPropertyId) {
