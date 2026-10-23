@@ -21,7 +21,7 @@ import React, { useState, useEffect } from 'react';
 const STORAGE_KEY = 'leasify_entry_v1';
 
 const EntryAnimation = () => {
-  // Default to non-blocking immediate access; only play if explicitly triggered via ?replay=true
+  // Synchronous initialization so it displays on frame 0 without flash
   const [shouldPlay] = useState(() => {
     if (typeof window === 'undefined') return false;
 
@@ -30,13 +30,25 @@ const EntryAnimation = () => {
       return false;
     }
 
-    // Play only when explicitly requested via URL query param ?replay=true
-    try {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('replay') === 'true';
-    } catch {
-      return false;
+    // Force replay with URL query param ?replay=true
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('replay') === 'true') {
+      return true;
     }
+
+    // Check session storage
+    try {
+      // Clear legacy key if present from previous run
+      sessionStorage.removeItem('leasify_has_seen_entry');
+      const hasSeen = sessionStorage.getItem(STORAGE_KEY);
+      if (hasSeen === 'true') {
+        return false;
+      }
+    } catch {
+      return true;
+    }
+
+    return true;
   });
 
   const [stage, setStage] = useState('draw'); // 'draw' | 'reveal' | 'branding' | 'exit' | 'done'
@@ -47,12 +59,14 @@ const EntryAnimation = () => {
 
     // Expose dev helper to replay anytime in console
     window.replayEntryAnimation = () => {
-      const url = new URL(window.location.href);
-      url.searchParams.set('replay', 'true');
-      window.location.href = url.toString();
+      try {
+        sessionStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem('leasify_has_seen_entry');
+      } catch {}
+      window.location.reload();
     };
 
-    console.log('✨ [Leasify] Playing architectural entry animation (?replay=true).');
+    console.log('✨ [Leasify] Playing architectural entry animation. (To replay anytime, call window.replayEntryAnimation() or append ?replay=true)');
 
     // Keyboard listener: Escape key skips immediately
     const handleKeyDown = (e) => {
@@ -62,18 +76,23 @@ const EntryAnimation = () => {
     };
     window.addEventListener('keydown', handleKeyDown);
 
-    // Fast, responsive timeline for explicit replays (~800ms total)
-    const t1 = setTimeout(() => setStage('reveal'), 200);
-    const t2 = setTimeout(() => setStage('branding'), 450);
-    const t3 = setTimeout(() => setStage('exit'), 700);
+    // Timeline (~2.5s total)
+    // 0.0s - 0.6s: Doorway stroke drawing
+    // 0.6s - 1.3s: Home interior reveal through doorway arch
+    // 1.3s - 2.1s: Leasify branding and tagline fade-up
+    // 2.1s - 2.6s: Portal expands outward and fades into site
+    // 2.6s: Complete unmount and session flag saved
+    const t1 = setTimeout(() => setStage('reveal'), 600);
+    const t2 = setTimeout(() => setStage('branding'), 1300);
+    const t3 = setTimeout(() => setStage('exit'), 2100);
     const t4 = setTimeout(() => {
       dismissImmediately();
-    }, 850);
+    }, 2600);
 
-    // Hard failsafe timer (1.1s)
+    // Hard failsafe timer (3.2s)
     const failsafe = setTimeout(() => {
       dismissImmediately();
-    }, 1100);
+    }, 3200);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
